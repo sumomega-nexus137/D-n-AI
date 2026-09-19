@@ -22,8 +22,17 @@ var/
 wheels/
 share/python-wheels/
 # Datasets (too large for git, downloaded via script/instructions instead)
-/data/
+/data/*
 /datasets/
+!/data/README.md
+!/data/module1_grain/
+!/data/module1_grain/*/
+/data/module1_grain/*/*
+!/data/module1_grain/*/.gitkeep
+!/data/module2_disease/
+!/data/module2_disease/*/
+/data/module2_disease/*/*
+!/data/module2_disease/*/.gitkeep
 
 # Model weights and cached embeddings
 *.pt
