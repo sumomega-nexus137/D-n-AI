@@ -240,3 +240,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# тестовые артефакты сегментации
+/scripts/out_crops/
+/scripts/out_synthetic_input.png
