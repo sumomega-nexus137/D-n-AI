@@ -20,14 +20,27 @@ from backend.app.module1_grain.segmentation import segment_grains
 
 
 def make_synthetic_image(n_grains: int = 25, size: int = 800) -> np.ndarray:
+    """Эллипсы с лёгким радиальным градиентом (имитация блика на реальном
+    зерне) — плоская заливка не даёт watershed'у по яркости зацепиться
+    за единственный пик на зерно."""
     rng = np.random.default_rng(42)
     img = np.full((size, size, 3), 20, dtype=np.uint8)  # тёмный фон
     for _ in range(n_grains):
         cx, cy = rng.integers(60, size - 60, size=2)
-        axes = (int(rng.integers(18, 30)), int(rng.integers(10, 16)))
+        ax_a, ax_b = int(rng.integers(18, 30)), int(rng.integers(10, 16))
         angle = int(rng.integers(0, 180))
-        color = tuple(int(c) for c in rng.integers(160, 220, size=3))
-        cv2.ellipse(img, (int(cx), int(cy)), axes, angle, 0, 360, color, -1)
+        base_color = rng.integers(150, 190, size=3)
+
+        mask = np.zeros((size, size), dtype=np.uint8)
+        cv2.ellipse(mask, (int(cx), int(cy)), (ax_a, ax_b), angle, 0, 360, 255, -1)
+        dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+        if dist.max() > 0:
+            dist = dist / dist.max()
+        for c in range(3):
+            layer = img[:, :, c].astype(np.float32)
+            highlight = base_color[c] + dist * 50  # блик к центру ярче
+            layer = np.where(mask > 0, highlight, layer)
+            img[:, :, c] = layer.astype(np.uint8)
     return img
 
 

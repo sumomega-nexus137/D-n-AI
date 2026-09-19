@@ -10,3 +10,5 @@ scikit-learn
 joblib
 python-dotenv
 google-generativeai
+scipy
+scikit-image

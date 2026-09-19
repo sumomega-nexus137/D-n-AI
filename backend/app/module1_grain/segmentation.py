@@ -1,15 +1,25 @@
 """Классическая (без ML) сегментация зёрен на фото пробы пшеницы.
 
-Ожидается фото пробы: много отдельных зёрен на контрастном фоне
-(тёмный поднос/ткань, как в GrainSet). Пайплайн: бинаризация (Otsu) ->
-морфологическая чистка -> watershed для разделения слипшихся зёрен ->
-компоненты связности -> кроп каждого зерна с отступом.
+Фото пробы: много отдельных зёрен, сфотографированных сверху (на подносе,
+ладони, любом фоне). Пайплайн:
+1. Бинаризация зерно/фон — пробуем и яркость, и насыщенность цвета
+   (золотистое зерно на светлом фоне по одной только яркости не отличить,
+   а по насыщенности — отличается).
+2. Морфологическая чистка маски.
+3. Watershed по локальным максимумам ЯРКОСТИ (не distance transform!) —
+   у плотно слипшихся зёрен нет видимых промежутков в маске, но каждое
+   зерно даёт свой блик/светлое пятно на исходном фото за счёт кривизны
+   поверхности, и именно эти блики разделяют зёрна.
+4. Кроп каждого найденного зерна с отступом.
 """
 
 from dataclasses import dataclass
 
 import cv2
 import numpy as np
+from scipy import ndimage as ndi
+from skimage.feature import peak_local_max
+from skimage.segmentation import watershed
 
 
 @dataclass
@@ -20,75 +30,92 @@ class GrainCrop:
     centroid: tuple[float, float]
 
 
-def _binarize(gray: np.ndarray) -> np.ndarray:
-    """Otsu-порог. Пробуем обе полярности, берём ту, где доля переднего
-    плана более правдоподобна для фото пробы зерна (не пустое и не всё
-    фото целиком)."""
-    _, mask_a = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    mask_b = cv2.bitwise_not(mask_a)
+def _clean(mask: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    return mask
 
-    total = gray.size
-    frac_a = cv2.countNonZero(mask_a) / total
-    frac_b = cv2.countNonZero(mask_b) / total
 
-    def plausible(frac: float) -> float:
-        # ожидаем зёрна где-то на 5%-70% кадра; чем ближе к разумной
-        # середине, тем выше "правдоподобие"
-        target = 0.3
-        return -abs(frac - target)
+def _watershed_labels(mask: np.ndarray, gray_blur: np.ndarray, min_distance_px: int) -> np.ndarray:
+    mask_bool = mask.astype(bool)
+    coords = peak_local_max(gray_blur, min_distance=min_distance_px, labels=mask_bool)
+    markers_seed = np.zeros(gray_blur.shape, dtype=bool)
+    markers_seed[tuple(coords.T)] = True
+    markers, _ = ndi.label(markers_seed)
+    return watershed(255 - gray_blur, markers, mask=mask_bool)
 
-    return mask_a if plausible(frac_a) >= plausible(frac_b) else mask_b
+
+def _texture_score(gray_blur: np.ndarray, mask: np.ndarray) -> float:
+    """Насколько "шумная"/текстурная область под маской. Куча зерна почти
+    всегда заметно текстурнее фона (стол/ткань/рука) — это надёжный
+    сигнал для выбора правильной полярности маски, в отличие от подсчёта
+    компонент после watershed (тот обманчив: неправильная маска фона
+    после watershed'а может случайно нарезаться на много кусочков
+    "подходящего" размера)."""
+    lap = cv2.Laplacian(gray_blur, cv2.CV_64F)
+    fg = lap[mask > 0]
+    return float(fg.var()) if fg.size else 0.0
+
+
+def _binarize_and_segment(
+    image_bgr: np.ndarray, min_area_px: int, max_area_px: float, min_distance_px: int
+) -> np.ndarray:
+    """Строим несколько кандидатов-масок (по яркости и по насыщенности
+    цвета, в обеих полярностях — золотистое зерно на светлом фоне по
+    одной яркости не отличить, а по насыщенности отличается), выбираем
+    ту, что текстурнее (см. _texture_score), и на ней одной гоняем
+    watershed."""
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    gray_blur = cv2.GaussianBlur(gray, (3, 3), 0)
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+    sat = cv2.GaussianBlur(hsv[:, :, 1], (5, 5), 0)
+
+    candidates = []
+    for channel in (gray_blur, sat):
+        _, m1 = cv2.threshold(channel, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        for m in (m1, cv2.bitwise_not(m1)):
+            candidates.append(_clean(m, kernel))
+
+    best_mask, best_score = candidates[0], -1.0
+    for m in candidates:
+        score = _texture_score(gray_blur, m)
+        if score > best_score:
+            best_mask, best_score = m, score
+
+    return _watershed_labels(best_mask, gray_blur, min_distance_px)
 
 
 def segment_grains(
     image_bgr: np.ndarray,
     min_area_px: int = 150,
     max_area_frac: float = 0.05,
-    pad: int = 6,
+    min_distance_px: int = 14,
+    pad: int = 4,
 ) -> list[GrainCrop]:
     """Находит отдельные зёрна на фото пробы и возвращает их кропы.
 
     min_area_px: отсекаем совсем мелкий мусор/шум
-    max_area_frac: отсекаем совсем гигантские компоненты (слипшийся ком,
-        либо неудачная бинаризация всего кадра) — доля от площади фото
+    max_area_frac: отсекаем совсем гигантские компоненты — доля от площади фото
+    min_distance_px: минимальное расстояние между бликами соседних зёрен
+        (примерно половина ширины зерна в пикселях на типичном фото)
     pad: отступ в пикселях вокруг bbox при кропе
     """
     h, w = image_bgr.shape[:2]
-    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    mask = _binarize(gray)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-    # watershed, чтобы разделить слипшиеся зёрна
-    dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-    _, sure_fg = cv2.threshold(dist, 0.4 * dist.max(), 255, 0)
-    sure_fg = np.uint8(sure_fg)
-    sure_bg = cv2.dilate(mask, kernel, iterations=3)
-    unknown = cv2.subtract(sure_bg, sure_fg)
-
-    _, markers = cv2.connectedComponents(sure_fg)
-    markers = markers + 1
-    markers[unknown == 255] = 0
-
-    image_for_ws = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-    cv2.watershed(image_for_ws, markers)
-
     max_area_px = max_area_frac * (h * w)
-    crops: list[GrainCrop] = []
 
-    for label in np.unique(markers):
-        if label <= 1:  # 0 = граница watershed, 1 = фон
+    labels = _binarize_and_segment(image_bgr, min_area_px, max_area_px, min_distance_px)
+
+    crops: list[GrainCrop] = []
+    for label in np.unique(labels):
+        if label == 0:
             continue
-        component_mask = np.uint8(markers == label) * 255
-        area = int(cv2.countNonZero(component_mask))
+        component_mask = (labels == label)
+        area = int(component_mask.sum())
         if area < min_area_px or area > max_area_px:
             continue
 
-        ys, xs = np.where(component_mask > 0)
+        ys, xs = np.where(component_mask)
         x0, x1 = max(0, xs.min() - pad), min(w, xs.max() + pad)
         y0, y1 = max(0, ys.min() - pad), min(h, ys.max() + pad)
 
