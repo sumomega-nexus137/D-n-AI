@@ -133,11 +133,36 @@ Healthy (102), septoria (97), stripe_rust (208).
 - `Septoria` = `septoria` — септориоз
 - `Healthy` = `Healthy` — здоровый лист
 
-### Сорняки — пока не закрыто
+### Сорняки
 
-Ни один из проверенных источников не содержит сорняков. Ищем отдельно на
-Roboflow Universe (https://universe.roboflow.com/search?q=wheat%20weed) —
-в процессе.
+Roboflow Universe оказался непригоден — там только аэро-снимки поля сверху
+(не подходит под наш пайплайн "крупный план одного объекта").
 
-Детали по итоговой скачанной подвыборке (объёмы train/test) — будут
-дополнены после сборки финального датасета Модуля 2.
+Найден подходящий источник: **`vbookshelf/v2-plant-seedlings-dataset`**
+(Kaggle, лицензия CC-BY-SA-4.0) — классический "Plant Seedlings Dataset"
+(Aarhus University), крупные фото отдельных ростков. 12 классов: 3 культуры
+(Common wheat, Maize, Sugar beet — не используем) + **9 видов сорняков**
+(используем): Black-grass (309), Charlock (452), Cleavers (335), Common
+Chickweed (713), Fat Hen (538), Loose Silky-bent (762), Scentless Mayweed
+(607), Shepherd's Purse (274), Small-flowered Cranesbill (576).
+
+В архиве также есть папка `nonsegmentedv2` — дубликаты тех же фото без
+удаления фона, **не используем** (сегментированные версии в корневых папках
+чище).
+
+### Финальная таксономия Модуля 2
+
+Берём классы "как есть" из источников (без искусственного объединения в
+5 категорий, как в Модуле 1) — итоговый список:
+
+**Болезни/вредители** (источник: `wheat-plant-diseases` + `wheat-leaf-dataset`,
+объединены дубли Yellow Rust=stripe_rust, Septoria=septoria, Healthy=Healthy):
+Healthy, Black Rust, Blast, Brown Rust, Common Root Rot, Fusarium Head
+Blight, Leaf Blight, Mildew, Septoria/stripe_rust(Yellow Rust), Smut, Tan
+spot, Aphid, Mite, Stem fly — 14 классов.
+
+**Сорняки** (источник: Plant Seedlings Dataset): Black-grass, Charlock,
+Cleavers, Common Chickweed, Fat Hen, Loose Silky-bent, Scentless Mayweed,
+Shepherd's Purse, Small-flowered Cranesbill — 9 классов.
+
+Итого 23 класса для Модуля 2. Объёмы финальной подвыборки — см. ниже.
