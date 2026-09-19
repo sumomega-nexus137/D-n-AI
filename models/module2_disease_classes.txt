@@ -1,0 +1,24 @@
+Aphid
+Black Rust
+Blast
+Brown Rust
+Common Root Rot
+Fusarium Head Blight
+Healthy
+Leaf Blight
+Mildew
+Mite
+Septoria
+Smut
+Stem fly
+Tan spot
+Yellow Rust
+weed_Black-grass
+weed_Charlock
+weed_Cleavers
+weed_Common Chickweed
+weed_Fat Hen
+weed_Loose Silky-bent
+weed_Scentless Mayweed
+weed_Shepherd's Purse
+weed_Small-flowered Cranesbill

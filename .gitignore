@@ -40,6 +40,8 @@ share/python-wheels/
 *.onnx
 *.npy
 *.pkl
+# исключение: обученные головы-классификаторы (LogReg), маленькие, версионируем
+!/models/*.pkl
 
 # Hugging Face / torch hub cache (where DINOv2 weights get downloaded to)
 .cache/
