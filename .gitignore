@@ -21,6 +21,19 @@ sdist/
 var/
 wheels/
 share/python-wheels/
+# Datasets (too large for git, downloaded via script/instructions instead)
+/data/
+/datasets/
+
+# Model weights and cached embeddings
+*.pt
+*.pth
+*.onnx
+*.npy
+*.pkl
+
+# Hugging Face / torch hub cache (where DINOv2 weights get downloaded to)
+.cache/
 *.egg-info/
 .installed.cfg
 *.egg
