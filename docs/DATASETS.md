@@ -107,5 +107,37 @@ GrainSet (не пересекаются, честный held-out).
 "фото листа крупным планом" или требуют долгой фильтрации не по времени):
 Agriculture-Vision (дрон-снимки полей), PlantNet, iNaturalist.
 
-Детали (классы, ссылки на скачивание, объёмы) — будут заполнены при
-скачивании на следующем шаге.
+### PlantDoc — проверен, не подходит
+
+https://github.com/pratikkayal/PlantDoc-Dataset — скачан, но **не содержит
+ни пшеницы, ни ячменя** (только яблоня, томат, картофель, виноград, кукуруза
+и др.). Не используется для Модуля 2.
+
+### Основные источники болезней/вредителей пшеницы (Kaggle)
+
+**`kushagra3204/wheat-plant-diseases`** (лицензия CC0-1.0, скачан):
+Aphid (903), Black Rust (576), Blast (647), Brown Rust (1271), Common Root
+Rot (614), Fusarium Head Blight (611), Healthy (1000), Leaf Blight (842),
+Mildew (1081), Mite (800), Septoria (1144), Smut (1310), Stem fly (234),
+Tan spot (770), Yellow Rust (1301). Готовое разбиение `train/valid/test`.
+Помимо болезней содержит вредителей (Aphid/тля, Mite/клещ, Stem fly/
+стеблевая муха) — оставляем как бонус сверх исходного плана.
+
+**`olyadgetch/wheat-leaf-dataset`** (лицензия copyright-authors, скачан):
+Healthy (102), septoria (97), stripe_rust (208).
+
+**Объединение классов между источниками** (одинаковые заболевания под
+разными именами):
+- `Yellow Rust` (kushagra) = `stripe_rust` (olyadgetch) — жёлтая/полосатая
+  ржавчина
+- `Septoria` = `septoria` — септориоз
+- `Healthy` = `Healthy` — здоровый лист
+
+### Сорняки — пока не закрыто
+
+Ни один из проверенных источников не содержит сорняков. Ищем отдельно на
+Roboflow Universe (https://universe.roboflow.com/search?q=wheat%20weed) —
+в процессе.
+
+Детали по итоговой скачанной подвыборке (объёмы train/test) — будут
+дополнены после сборки финального датасета Модуля 2.
