@@ -30,15 +30,16 @@ def _pct(value: float) -> str:
 def format_grain(data: dict) -> str:
     lines = ["<b>📊 Качество зерна</b>", ""]
 
-    grade = data.get("grade")
-    lines.append(f"<b>Класс:</b> {data['grade_label']}")
+    lines.append(f"<b>Класс:</b> {data['grade_label']} <i>(ориентировочно, по фото)</i>")
     if data.get("price_kzt_per_ton"):
         lines.append(f"<b>Цена:</b> ~{_kzt(data['price_kzt_per_ton'])} за тонну")
         rng = data.get("price_range_kzt_per_ton")
         if rng:
-            lines.append(f"<i>Диапазон: {_kzt(rng[0])} — {_kzt(rng[1])}</i>")
-    else:
-        lines.append("<b>Цена:</b> партия не проходит под 5 класс")
+            lines.append(f"<i>Рынок: {_kzt(rng[0])} — {_kzt(rng[1])}</i>")
+
+    loss = data.get("loss_vs_best_kzt_per_ton") or 0
+    if loss > 0:
+        lines.append(f"<b>Теряете против 3 класса:</b> −{_kzt(loss)} с тонны")
 
     gain = data.get("potential_gain_kzt_per_ton") or 0
     if gain > 0:

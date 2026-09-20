@@ -145,8 +145,11 @@ class ChatRequest(BaseModel):
 def _consultant_prompt(message: str, context: dict | None) -> str:
     """Собираем промпт для Gemini: роль агронома + контекст последнего анализа."""
     parts = [
-        "Ты — агроном-консультант сервиса D-n-AI для фермеров Казахстана. "
-        "Отвечай по-русски, коротко и по делу (до 6 предложений), практично. "
+        "Ты — советник по партии зерна в сервисе Dän-AI для фермеров Казахстана. "
+        "Твоя задача — помочь решить, что делать с партией: чистить или продавать, "
+        "как не потерять класс и деньги, чем обработать посев. "
+        "Отвечай по-русски, коротко и практично (до 6 предложений), простым языком, "
+        "без технического жаргона. Где уместно — говори о деньгах за тонну. "
         "Не выдумывай точные дозировки препаратов — советуй уточнить их у "
         "агронома по регламенту применения.",
     ]
@@ -188,10 +191,28 @@ async def chat(req: ChatRequest) -> dict:
 
         genai.configure(api_key=config.GEMINI_API_KEY)
         model = genai.GenerativeModel(config.GEMINI_MODEL)
+        # Разговоры про фунгициды и дозы штатные фильтры часто режут в пустоту —
+        # блокируем только явно опасный контент.
+        safety = [
+            {"category": c, "threshold": "BLOCK_ONLY_HIGH"}
+            for c in (
+                "HARM_CATEGORY_HARASSMENT",
+                "HARM_CATEGORY_HATE_SPEECH",
+                "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "HARM_CATEGORY_DANGEROUS_CONTENT",
+            )
+        ]
         result = await asyncio.to_thread(
-            model.generate_content, _consultant_prompt(req.message, req.context)
+            model.generate_content,
+            _consultant_prompt(req.message, req.context),
+            safety_settings=safety,
+            generation_config={"temperature": 0.4, "max_output_tokens": 600},
+            request_options={"timeout": 45},
         )
-        return {"reply": (result.text or "").strip()}
+        reply = (getattr(result, "text", "") or "").strip()
+        if not reply:
+            raise ValueError("пустой ответ модели")
+        return {"reply": reply}
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001

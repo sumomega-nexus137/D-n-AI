@@ -46,25 +46,25 @@ export default function GrainResult({ data, onConsult }) {
         </div>
       )}
 
-      {/* Три ключевые плитки */}
+      {/* Три ключевые плитки — читаются за секунды */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile label="Предварительный класс" accent="bg-gold-500/20">
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-4xl font-bold text-white">
-              {data.grade ?? "—"}
-            </span>
-            <span className="text-lg text-slate-300">
-              {data.grade ? "класс" : data.grade_label}
-            </span>
-          </div>
+          {data.grade ? (
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-5xl font-bold text-white">{data.grade}</span>
+              <span className="text-lg text-slate-300">класс</span>
+            </div>
+          ) : (
+            <div className="font-display text-2xl font-bold text-white">{data.grade_label}</div>
+          )}
         </StatTile>
 
         <StatTile
           label="Ориентировочная цена"
           sub={
             data.price_range_kzt_per_ton
-              ? `${kzt(data.price_range_kzt_per_ton[0])} — ${kzt(data.price_range_kzt_per_ton[1])}`
-              : "партия не проходит 5 класс"
+              ? `рынок: ${kzt(data.price_range_kzt_per_ton[0])} — ${kzt(data.price_range_kzt_per_ton[1])}`
+              : null
           }
         >
           <div className="font-display text-3xl font-bold text-white">
@@ -74,20 +74,44 @@ export default function GrainResult({ data, onConsult }) {
         </StatTile>
 
         <StatTile
-          label="Потенциал после очистки"
-          accent="bg-moss-500/20"
+          label="Против 3 класса"
+          accent={data.loss_vs_best_kzt_per_ton > 0 ? "bg-rose-500/20" : "bg-moss-500/20"}
           sub={
-            data.potential_grade
-              ? `возможный класс: ${data.potential_grade}`
-              : "очистка не поднимает класс"
+            data.loss_vs_best_kzt_per_ton > 0
+              ? "столько теряете на каждой тонне"
+              : "это лучший класс — потерь нет"
           }
         >
-          <div className="font-display text-3xl font-bold text-moss-300">
-            {data.potential_gain_kzt_per_ton > 0 ? `+${kzt(data.potential_gain_kzt_per_ton)}` : "—"}
+          <div
+            className={`font-display text-3xl font-bold ${
+              data.loss_vs_best_kzt_per_ton > 0 ? "text-rose-300" : "text-moss-300"
+            }`}
+          >
+            {data.loss_vs_best_kzt_per_ton > 0
+              ? `− ${kzt(data.loss_vs_best_kzt_per_ton)}`
+              : "0 ₸"}
           </div>
-          {data.potential_gain_kzt_per_ton > 0 ? <div className="text-xs text-slate-500">за тонну</div> : null}
+          <div className="text-xs text-slate-500">за тонну</div>
         </StatTile>
       </div>
+
+      {/* Главное действие — если очистка реально даёт деньги */}
+      {data.potential_gain_kzt_per_ton > 0 && (
+        <div className="glass flex flex-col gap-1 border-moss-400/20 bg-moss-400/[0.05] p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-[15px] font-semibold text-white">
+              После очистки — {data.potential_grade} класс
+            </div>
+            <div className="text-sm text-slate-400">
+              Это главное, что можно сделать с партией прямо сейчас
+            </div>
+          </div>
+          <div className="font-display text-2xl font-bold text-moss-300">
+            + {kzt(data.potential_gain_kzt_per_ton)}
+            <span className="ml-1 text-sm font-medium text-slate-400">/т</span>
+          </div>
+        </div>
+      )}
 
       {/* Состав пробы */}
       <div className="glass p-6">

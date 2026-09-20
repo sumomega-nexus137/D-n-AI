@@ -26,6 +26,21 @@ const NGROK_HEADER = { "ngrok-skip-browser-warning": "true" };
 const PREVIEW = import.meta.env.VITE_PREVIEW === "1";
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Медленный интернет не должен вешать страницу навсегда: обрываем запрос
+// по таймауту и показываем понятную ошибку.
+const ANALYZE_TIMEOUT_MS = 90_000;
+const CHAT_TIMEOUT_MS = 60_000;
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function postImage(path, file) {
   if (PREVIEW) {
     const { DEMO_GRAIN, DEMO_DISEASE } = await import("./demoResults.js");
@@ -45,12 +60,18 @@ async function postImage(path, file) {
 
   let response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
-      method: "POST",
-      body: form,
-      headers: NGROK_HEADER,
-    });
-  } catch {
+    response = await fetchWithTimeout(
+      `${BASE_URL}${path}`,
+      { method: "POST", body: form, headers: NGROK_HEADER },
+      ANALYZE_TIMEOUT_MS
+    );
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new ApiError(
+        "Сервер долго не отвечает. Проверьте интернет и попробуйте ещё раз.",
+        408
+      );
+    }
     throw new ApiError("offline", 0);
   }
 
@@ -89,12 +110,19 @@ export async function askConsultant(message, context) {
   }
   let response;
   try {
-    response = await fetch(`${BASE_URL}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...NGROK_HEADER },
-      body: JSON.stringify({ message, context: context ?? null }),
-    });
-  } catch {
+    response = await fetchWithTimeout(
+      `${BASE_URL}/chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...NGROK_HEADER },
+        body: JSON.stringify({ message, context: context ?? null }),
+      },
+      CHAT_TIMEOUT_MS
+    );
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new ApiError("Консультант долго не отвечает. Попробуйте ещё раз.", 408);
+    }
     throw new ApiError("offline", 0);
   }
   if (!response.ok) {

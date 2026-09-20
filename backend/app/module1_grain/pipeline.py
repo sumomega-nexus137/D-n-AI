@@ -127,6 +127,8 @@ def _to_payload(
         ),
         "potential_grade": assessment.potential_grade,
         "potential_gain_kzt_per_ton": round(assessment.potential_gain_kzt_per_ton),
+        "loss_vs_best_kzt_per_ton": round(assessment.loss_vs_best_kzt_per_ton),
+        "best_grade_price_kzt_per_ton": round(config.PRICE_CLASS_3_KZT),
         "recommendations": [
             {
                 "title": r.title,
@@ -138,8 +140,8 @@ def _to_payload(
         ],
         "confidence_note": assessment.confidence_note,
         "disclaimer": (
-            "Ориентировочная оценка по внешнему виду зерна на фото. "
-            "Официальная классность определяется лабораторно (клейковина, "
-            "число падения, натура, влажность)."
+            "Ориентировочно, по внешнему виду зерна на фото. Цены — рыночные "
+            "ориентиры. Официальная классность определяется лабораторно "
+            "(клейковина, число падения, натура, влажность)."
         ),
     }

@@ -68,7 +68,7 @@ export default function Hero({ onAnalyze, onScrollModules }) {
           custom={1}
           className="mt-6 max-w-3xl text-[42px] font-extrabold leading-[0.98] text-white sm:text-6xl md:text-7xl"
         >
-          Качество зерна
+          Класс зерна и деньги
           <br />
           <span className="text-gradient-gold">по одному фото</span>
         </motion.h1>
@@ -80,9 +80,11 @@ export default function Hero({ onAnalyze, onScrollModules }) {
           custom={2}
           className="mt-6 max-w-xl text-lg leading-relaxed text-slate-300/90"
         >
-          Сфотографируйте пробу зерна или больной лист — получите доли по
-          категориям, предварительный класс, цену в тенге и точные шаги. За
-          секунды, с телефона.
+          Сегодня фермер сдаёт партию вслепую или ждёт лабораторию, когда менять
+          уже поздно. Dän-AI за секунды с телефона отвечает на три вопроса:
+          <b className="text-white"> какой класс</b>,
+          <b className="text-white"> сколько теряете в тенге</b> и
+          <b className="text-white"> что сделать прямо сейчас</b>.
         </motion.p>
 
         <motion.div

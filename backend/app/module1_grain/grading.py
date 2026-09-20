@@ -37,6 +37,13 @@ GRADE_PRICES_KZT = {
     5: config.PRICE_CLASS_5_KZT,
 }
 
+# Вилка «от и до» по каждому классу — её показываем фермеру
+GRADE_PRICE_RANGES_KZT = {
+    3: (config.PRICE_CLASS_3_MIN_KZT, config.PRICE_CLASS_3_MAX_KZT),
+    4: (config.PRICE_CLASS_4_MIN_KZT, config.PRICE_CLASS_4_MAX_KZT),
+    5: (config.PRICE_CLASS_5_MIN_KZT, config.PRICE_CLASS_5_MAX_KZT),
+}
+
 # Эффективность механической очистки (решётная очистка / просеивание):
 # сорную примесь убирает почти полностью, битое и щуплое — частично.
 CLEANING_REMOVAL = {
@@ -79,6 +86,7 @@ class GrainAssessment:
     price_range_kzt_per_ton: tuple[float, float] | None
     potential_grade: int | None
     potential_gain_kzt_per_ton: float
+    loss_vs_best_kzt_per_ton: float = 0.0
     recommendations: list[Recommendation] = field(default_factory=list)
     confidence_note: str | None = None
 
@@ -123,13 +131,10 @@ def _grade_label(grade: int | None) -> str:
     return f"{grade} класс"
 
 
-def _price_range(grade: int | None) -> tuple[float, float] | None:
+def _price_range(grade: int | None) -> tuple[float, float]:
     if grade is None:
-        return None
-    if grade == 3:
-        return (config.PRICE_CLASS_3_MIN_KZT, config.PRICE_CLASS_3_MAX_KZT)
-    price = GRADE_PRICES_KZT[grade]
-    return (price * 0.93, price * 1.07)
+        return (config.PRICE_FODDER_MIN_KZT, config.PRICE_FODDER_MAX_KZT)
+    return GRADE_PRICE_RANGES_KZT[grade]
 
 
 def _build_recommendations(
@@ -144,66 +149,51 @@ def _build_recommendations(
     thin = pct["shuploe_melkoe"]
     sprouted = pct["prorosshee"]
 
+    if potential_grade is not None and gain > 0 and (grade is None or potential_grade < grade):
+        recs.append(
+            Recommendation(
+                title=f"Очистить партию — поднимете до {potential_grade} класса",
+                detail=f"Прибавка примерно {_kzt(gain)} с каждой тонны.",
+                priority="high",
+                gain_kzt_per_ton=gain,
+            )
+        )
+
     if foreign > 2.0:
         recs.append(
             Recommendation(
-                title="Просеять партию",
-                detail=(
-                    f"Сорная примесь {_pct(foreign)} — выше нормы 2%. Просеивание на "
-                    "решётной очистке уберёт основную часть сора и поднимет сортность."
-                ),
+                title="Просеять: много сора",
+                detail=f"Сорной примеси {_pct(foreign)} при норме 2%. Решётная очистка уберёт основное.",
                 priority="high",
             )
         )
 
     if broken + thin > 5.0:
-        detail = (
-            f"Битого и щуплого зерна {_pct(broken + thin)}. Дочистка на сепараторе "
-            "с калибровкой по размеру отсеет мелкую и дроблёную фракцию."
-        )
         recs.append(
             Recommendation(
-                title="Провести дочистку зерна",
-                detail=detail,
+                title="Дочистить на сепараторе",
+                detail=f"Битого и щуплого {_pct(broken + thin)}. Калибровка по размеру отсеет мелочь.",
                 priority="high" if broken + thin > 12.0 else "medium",
-                gain_kzt_per_ton=gain if gain > 0 else None,
             )
         )
 
     if sprouted > 1.0:
         recs.append(
             Recommendation(
-                title="Проверить условия хранения",
+                title="Проверить склад — есть проростки",
                 detail=(
-                    f"Проросшего зерна {_pct(sprouted)}. Очисткой это не исправить — "
-                    "проверьте влажность и вентиляцию склада, партию продавайте быстрее."
+                    f"Проросшего {_pct(sprouted)}. Очисткой не убрать: проверьте влажность "
+                    "и вентиляцию, продавайте быстрее."
                 ),
                 priority="high" if sprouted > 3.0 else "medium",
-            )
-        )
-
-    if potential_grade is not None and gain > 0 and (grade is None or potential_grade < grade):
-        recs.append(
-            Recommendation(
-                title=f"Можно поднять до {potential_grade} класса",
-                detail=(
-                    f"После очистки партия проходит под {potential_grade} класс. "
-                    f"Прибавка около {_kzt(gain)} за тонну."
-                ),
-                priority="high",
-                gain_kzt_per_ton=gain,
             )
         )
 
     if grade == 5 or grade is None:
         recs.append(
             Recommendation(
-                title="Рассмотреть продажу на корм или подработку",
-                detail=(
-                    "По внешнему виду партия тянет максимум на 5 класс. Если очистка "
-                    "не выводит выше — выгоднее продавать на фуражные цели или сдать "
-                    "на подработку элеватору."
-                ),
+                title="Не выводится выше — продавайте на корм",
+                detail="Фуражные цели или сдача на подработку элеватору будут выгоднее.",
                 priority="medium",
             )
         )
@@ -212,10 +202,7 @@ def _build_recommendations(
         recs.append(
             Recommendation(
                 title="Партия в хорошем состоянии",
-                detail=(
-                    "Показатели укладываются в 3 класс. Держите влажность в норме "
-                    "при хранении, чтобы не потерять класс до продажи."
-                ),
+                detail="Держите влажность в норме при хранении, чтобы не потерять класс до продажи.",
                 priority="low",
             )
         )
@@ -265,17 +252,19 @@ def assess(counts: dict[str, int]) -> GrainAssessment:
     # фуражное зерно, и мы даём фуражную цену, а не «нет цены».
     if grade is None:
         price = config.PRICE_FODDER_KZT
-        price_range = (config.PRICE_FODDER_KZT * 0.93, config.PRICE_FODDER_KZT * 1.07)
         grade_label = "Фуражное (ниже 5 класса)"
     else:
         price = GRADE_PRICES_KZT[grade]
-        price_range = _price_range(grade)
         grade_label = f"{grade} класс"
+    price_range = _price_range(grade)
 
     potential_price = GRADE_PRICES_KZT.get(potential_grade) if potential_grade else None
     gain = 0.0
     if potential_price is not None and potential_price > price:
         gain = potential_price - price
+
+    # Сколько партия теряет против хорошего 3 класса — главный ориентир по деньгам
+    loss_vs_best = max(0.0, config.PRICE_CLASS_3_KZT - price)
 
     recommendations = _build_recommendations(pct, grade, potential_grade, gain)
 
@@ -303,6 +292,7 @@ def assess(counts: dict[str, int]) -> GrainAssessment:
         price_range_kzt_per_ton=price_range,
         potential_grade=potential_grade,
         potential_gain_kzt_per_ton=gain,
+        loss_vs_best_kzt_per_ton=loss_vs_best,
         recommendations=recommendations,
         confidence_note=confidence_note,
     )

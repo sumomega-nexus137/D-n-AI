@@ -35,12 +35,13 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 REQUEST_TIMEOUT = float(os.environ.get("BOT_REQUEST_TIMEOUT", 90))
 
 WELCOME = (
-    "<b>Dän-AI — агроскан</b>\n\n"
-    "Пришлите фото — я сам определю, что на нём, и разберу:\n\n"
-    "🌾 <b>Проба зерна</b> — доли по категориям, предварительный класс, "
-    "цена в тенге и как поднять сортность\n"
-    "🌱 <b>Лист или растение</b> — болезнь, вредитель или сорняк с мерами обработки\n\n"
-    "Можно также надиктовать голосовое сообщение с вопросом — отвечу текстом.\n\n"
+    "<b>Dän-AI — советник по вашей партии зерна</b>\n\n"
+    "Пришлите фото — я сам пойму, что на нём, и отвечу на три вопроса:\n"
+    "какой класс, сколько теряете в тенге и что сделать прямо сейчас.\n\n"
+    "🌾 <b>Проба зерна</b> — предварительный класс, цена за тонну, потери "
+    "против 3 класса и прибавка после очистки\n"
+    "🌱 <b>Лист или растение</b> — болезнь, вредитель или сорняк и меры обработки\n\n"
+    "Можно надиктовать голосовое (казахский или русский) — отвечу текстом.\n\n"
     "<i>Как снимать зерно:</i> разложите пробу тонким слоем на контрастном фоне, "
     "снимайте сверху при ровном свете.\n"
     "<i>Как снимать растение:</i> поражённый лист крупным планом, при дневном свете."
@@ -138,6 +139,22 @@ def _extract_text(result) -> str:
     return ""
 
 
+# Агрономия — это разговоры про протравители, фунгициды и дозы. Стандартные
+# фильтры Gemini нередко режут такие ответы в пустоту, и пользователь видел
+# «не расслышал». Поэтому блокируем только явно опасный контент.
+SAFETY = [
+    {"category": c, "threshold": "BLOCK_ONLY_HIGH"}
+    for c in (
+        "HARM_CATEGORY_HARASSMENT",
+        "HARM_CATEGORY_HATE_SPEECH",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "HARM_CATEGORY_DANGEROUS_CONTENT",
+    )
+]
+GEN_CONFIG = {"temperature": 0.4, "max_output_tokens": 600}
+GEMINI_TIMEOUT_S = 45
+
+
 async def _voice_reply(mime_type: str, audio_bytes: bytes) -> str:
     """Аудио -> Gemini, с одним повтором при пустом ответе."""
     import google.generativeai as genai
@@ -148,7 +165,13 @@ async def _voice_reply(mime_type: str, audio_bytes: bytes) -> str:
 
     for attempt in range(2):
         try:
-            result = await asyncio.to_thread(model.generate_content, payload)
+            result = await asyncio.to_thread(
+                model.generate_content,
+                payload,
+                safety_settings=SAFETY,
+                generation_config=GEN_CONFIG,
+                request_options={"timeout": GEMINI_TIMEOUT_S},
+            )
             text = _extract_text(result)
             if text:
                 return text

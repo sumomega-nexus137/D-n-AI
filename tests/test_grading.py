@@ -54,6 +54,8 @@ def test_clean_sample_is_third_grade():
         config.PRICE_CLASS_3_MAX_KZT,
     )
     assert a.potential_gain_kzt_per_ton == 0
+    # 3 класс — лучший, терять нечего
+    assert a.loss_vs_best_kzt_per_ton == 0
     assert titles(a) == ["Партия в хорошем состоянии"]
 
 
@@ -75,17 +77,21 @@ def test_dirty_sample_gets_cleaning_advice_and_upgrade():
         config.PRICE_CLASS_4_KZT - config.PRICE_CLASS_5_KZT
     )
 
-    assert "Просеять партию" in titles(a)
-    assert "Провести дочистку зерна" in titles(a)
-    assert "Можно поднять до 4 класса" in titles(a)
-    assert "Рассмотреть продажу на корм или подработку" in titles(a)
+    # теряем против 3 класса
+    assert a.loss_vs_best_kzt_per_ton == (
+        config.PRICE_CLASS_3_KZT - config.PRICE_CLASS_5_KZT
+    )
+    assert "Просеять: много сора" in titles(a)
+    assert "Дочистить на сепараторе" in titles(a)
+    assert "Очистить партию — поднимете до 4 класса" in titles(a)
+    assert "Не выводится выше — продавайте на корм" in titles(a)
 
 
 def test_foreign_impurity_within_norm_gives_no_sieving_advice():
     a = grading.assess(counts(celoe=990, primes=10))  # 1% сора, норма 2%
 
     assert a.grade == 3
-    assert "Просеять партию" not in titles(a)
+    assert "Просеять: много сора" not in titles(a)
 
 
 # --- проросшее: очисткой не лечится ----------------------------------------
@@ -94,14 +100,14 @@ def test_foreign_impurity_within_norm_gives_no_sieving_advice():
 def test_sprouted_grain_warns_about_storage_not_cleaning():
     a = grading.assess(counts(celoe=950, prorosshee=50))  # 5% проросшего
 
-    assert "Проверить условия хранения" in titles(a)
+    assert "Проверить склад — есть проростки" in titles(a)
     # проросшее очистка не убирает, класс подняться не должен
     assert a.potential_grade == a.grade
 
 
 def test_sprouted_above_three_percent_is_high_priority():
     a = grading.assess(counts(celoe=950, prorosshee=50))
-    rec = next(r for r in a.recommendations if r.title == "Проверить условия хранения")
+    rec = next(r for r in a.recommendations if r.title == "Проверить склад — есть проростки")
     assert rec.priority == "high"
 
 
@@ -122,7 +128,7 @@ def test_below_fifth_grade_shows_fodder_price_and_gain():
         config.PRICE_CLASS_3_KZT - config.PRICE_FODDER_KZT
     )
     # совет поднять класс обязан появиться, хотя текущего класса нет
-    assert "Можно поднять до 3 класса" in titles(a)
+    assert "Очистить партию — поднимете до 3 класса" in titles(a)
 
 
 # --- доверие к оценке -------------------------------------------------------
