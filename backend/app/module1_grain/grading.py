@@ -261,14 +261,21 @@ def assess(counts: dict[str, int]) -> GrainAssessment:
         cleaned["prorosshee"],
     )
 
-    price = GRADE_PRICES_KZT.get(grade) if grade else None
+    # Цена показывается всегда: если партия не проходит даже 5 класс — это
+    # фуражное зерно, и мы даём фуражную цену, а не «нет цены».
+    if grade is None:
+        price = config.PRICE_FODDER_KZT
+        price_range = (config.PRICE_FODDER_KZT * 0.93, config.PRICE_FODDER_KZT * 1.07)
+        grade_label = "Фуражное (ниже 5 класса)"
+    else:
+        price = GRADE_PRICES_KZT[grade]
+        price_range = _price_range(grade)
+        grade_label = f"{grade} класс"
+
     potential_price = GRADE_PRICES_KZT.get(potential_grade) if potential_grade else None
     gain = 0.0
-    if price is not None and potential_price is not None and potential_price > price:
+    if potential_price is not None and potential_price > price:
         gain = potential_price - price
-    elif price is None and potential_price is not None:
-        # Партия сейчас не проходит даже 5 класс — сравниваем с фуражной ценой
-        gain = potential_price - config.PRICE_FODDER_KZT
 
     recommendations = _build_recommendations(pct, grade, potential_grade, gain)
 
@@ -291,9 +298,9 @@ def assess(counts: dict[str, int]) -> GrainAssessment:
         grain_impurity_pct=grain_impurity_pct,
         sound_pct=sound_pct,
         grade=grade,
-        grade_label=_grade_label(grade),
+        grade_label=grade_label,
         price_kzt_per_ton=price,
-        price_range_kzt_per_ton=_price_range(grade),
+        price_range_kzt_per_ton=price_range,
         potential_grade=potential_grade,
         potential_gain_kzt_per_ton=gain,
         recommendations=recommendations,

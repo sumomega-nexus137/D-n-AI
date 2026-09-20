@@ -108,13 +108,15 @@ def test_sprouted_above_three_percent_is_high_priority():
 # --- партия ниже 5 класса ---------------------------------------------------
 
 
-def test_below_fifth_grade_compares_gain_with_fodder_price():
-    """Цены за класс нет — прибавку считаем от фуражной, а не от нуля."""
+def test_below_fifth_grade_shows_fodder_price_and_gain():
+    """Ниже 5 класса — показываем фуражную цену (не «нет цены») и прибавку от неё."""
     a = grading.assess(counts(celoe=900, primes=100))  # 10% сора
 
     assert a.grade is None
-    assert a.grade_label == "Ниже 5 класса"
-    assert a.price_kzt_per_ton is None
+    assert a.grade_label == "Фуражное (ниже 5 класса)"
+    # цена показывается всегда — это фуражное зерно
+    assert a.price_kzt_per_ton == config.PRICE_FODDER_KZT
+    assert a.price_range_kzt_per_ton is not None
     assert a.potential_grade == 3
     assert a.potential_gain_kzt_per_ton == (
         config.PRICE_CLASS_3_KZT - config.PRICE_FODDER_KZT

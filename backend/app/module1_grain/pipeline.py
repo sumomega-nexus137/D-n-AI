@@ -17,6 +17,14 @@ DEMO_COUNTS = {
     "primes": 39,
 }
 
+# Классы «повреждения» зерна. На телефонных фото (не на чистом сканере, где
+# обучалась модель) освещение и тени заставляют модель чаще ошибочно относить
+# нормальные зёрна к повреждённым. Поэтому зерно засчитываем как повреждённое
+# только если модель уверена: иначе считаем его здоровым. Это убирает ложный
+# «брак» и не завышает класс на реально плохих партиях (там модель уверена).
+DAMAGE_CLASSES = {"bitoe_povrezhdennoe", "shuploe_melkoe", "prorosshee"}
+DAMAGE_MIN_CONFIDENCE = 0.55
+
 
 def _decode_image(image_bytes: bytes) -> np.ndarray:
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
@@ -62,8 +70,15 @@ def analyze(image_bytes: bytes) -> dict:
         embeddings = embedder.embed_images(sampled, time_budget_s=budget)
         analyzed = len(embeddings)
         if analyzed:
-            for label_idx in head.predict(embeddings):
-                counts[head.classes[int(label_idx)]] += 1
+            probs = head.predict_proba(embeddings)
+            classes = head.classes
+            for row in probs:
+                top = int(np.argmax(row))
+                cls = classes[top]
+                # неуверенный «брак» -> считаем зерно здоровым (см. DAMAGE_* выше)
+                if cls in DAMAGE_CLASSES and float(row[top]) < DAMAGE_MIN_CONFIDENCE:
+                    cls = "celoe_zdorovoe"
+                counts[cls] += 1
 
     assessment = grading.assess(counts)
     payload = _to_payload(assessment, counts, time.perf_counter() - started, demo=False)
