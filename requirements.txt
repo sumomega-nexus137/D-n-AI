@@ -1,0 +1,10 @@
+# Зависимости для запуска готового прототипа (backend + сайт + консультант).
+# Веса DINOv2 скачиваются автоматически при первом запуске через torch.hub —
+# отдельно ставить их не нужно.
+#
+#   pip install -r requirements.txt
+#
+# Для Telegram-бота дополнительно:  pip install -r bot/requirements.txt
+# Для тестов:                       pip install -r requirements-dev.txt
+
+-r backend/requirements.txt

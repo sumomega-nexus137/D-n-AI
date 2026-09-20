@@ -23,7 +23,7 @@ import time
 import urllib.request
 
 REPO = "https://github.com/sumomega-nexus137/D-n-AI.git"
-BRANCH = "claude/agritech-ai-hackathon-tlv08x"
+BRANCH = "main"
 
 # гасим прошлый запуск, если был
 subprocess.run(["pkill", "-f", "uvicorn"])
