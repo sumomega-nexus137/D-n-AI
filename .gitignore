@@ -7,20 +7,22 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+# ВАЖНО: пути привязаны к корню репозитория. Без ведущего "/" шаблон "lib/"
+# из стандартного Python-gitignore глотает webapp/src/lib — исходники фронтенда.
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
 # Datasets (too large for git, downloaded via script/instructions instead)
 /data/*
 /datasets/

@@ -3,8 +3,8 @@
    а не белый экран. Запросы к API не кешируются — там всегда нужны
    свежие данные, а при их недоступности приложение само показывает пример. */
 
-const CACHE = "dnai-shell-v1";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest"];
+const CACHE = "dnai-shell-v2";
+const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

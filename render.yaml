@@ -1,0 +1,49 @@
+# Деплой на Render: https://render.com/docs/blueprint-spec
+#
+# Что делает: поднимает backend вместе с собранным сайтом (один Docker-образ)
+# и, опционально, Telegram-бота отдельным воркером.
+#
+# Ключи (GEMINI_API_KEY, TELEGRAM_BOT_TOKEN) помечены sync: false —
+# Render спросит их при создании и сохранит в своих Environment Variables.
+# В репозитории их нет и быть не должно.
+
+services:
+  - type: web
+    name: dnai-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # free тоже работает, но 512 МБ RAM мало для torch — возможны OOM
+    healthCheckPath: /health
+    envVars:
+      - key: INFERENCE_TIME_BUDGET_S
+        value: "3.5"
+      - key: MAX_GRAINS_PER_IMAGE
+        value: "400"
+      # Цены пшеницы, тенге за тонну — правятся без пересборки
+      - key: PRICE_CLASS_3_KZT
+        value: "102000"
+      - key: PRICE_CLASS_4_KZT
+        value: "85000"
+      - key: PRICE_CLASS_5_KZT
+        value: "70000"
+      - key: PRICE_FODDER_KZT
+        value: "55000"
+      # Нужен только для голосовых сообщений в боте; backend без него работает
+      - key: GEMINI_API_KEY
+        sync: false
+
+  - type: worker
+    name: dnai-bot
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r bot/requirements.txt
+    startCommand: python bot/main.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # Впишите адрес сервиса dnai-api со схемой, например
+      # https://dnai-api.onrender.com  (Render покажет его после первого деплоя)
+      - key: BACKEND_URL
+        sync: false

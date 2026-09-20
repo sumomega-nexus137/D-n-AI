@@ -10,6 +10,10 @@ load_dotenv()
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 MODELS_DIR = Path(os.environ.get("MODELS_DIR", PROJECT_ROOT / "models"))
 
+# Собранный фронтенд. Если папка есть — backend раздаёт сайт сам (один контейнер
+# на всё, как в Dockerfile). Если нет — работает только API.
+WEBAPP_DIST = Path(os.environ.get("WEBAPP_DIST", PROJECT_ROOT / "webapp" / "dist"))
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")

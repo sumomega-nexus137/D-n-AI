@@ -4,6 +4,7 @@ import logging
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .common import config, embedder
 from .module1_grain import pipeline as grain_pipeline
@@ -78,3 +79,19 @@ async def predict_disease(file: UploadFile = File(...)) -> dict:
     except Exception as exc:  # noqa: BLE001
         logger.exception("Ошибка анализа растения")
         raise HTTPException(500, f"Ошибка анализа: {exc}") from exc
+
+
+# Раздача собранного сайта. Монтируется последней, чтобы не перехватывать /health
+# и /predict/*. Если сборки нет (локальная разработка через vite dev) — просто API.
+if (config.WEBAPP_DIST / "index.html").exists():
+    app.mount("/", StaticFiles(directory=config.WEBAPP_DIST, html=True), name="webapp")
+    logger.info("Сайт раздаётся из %s", config.WEBAPP_DIST)
+else:
+    logger.info("Сборка фронтенда не найдена (%s) — работает только API", config.WEBAPP_DIST)
+
+    @app.get("/")
+    async def root() -> dict:
+        return {
+            "service": "D-n-AI",
+            "endpoints": ["/health", "/predict/grain", "/predict/disease", "/docs"],
+        }

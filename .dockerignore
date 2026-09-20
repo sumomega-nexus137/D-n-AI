@@ -1,0 +1,21 @@
+# Секреты — никогда не попадают в образ
+.env
+**/.env
+
+# Мусор и то, что пересобирается внутри контейнера
+.git
+.github
+__pycache__/
+**/__pycache__/
+*.pyc
+webapp/node_modules
+webapp/dist
+data/
+datasets/
+notebooks/
+scripts/out_crops/
+docs/
+*.md
+!README.md
+.venv
+venv/
