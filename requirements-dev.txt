@@ -1,0 +1,3 @@
+# Зависимости для разработки и тестов (в проде не нужны)
+-r backend/requirements.txt
+pytest
