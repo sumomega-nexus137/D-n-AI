@@ -3,12 +3,14 @@
 import asyncio
 import logging
 
+import cv2
+import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .common import config, embedder
+from .common import config, embedder, router
 from .module1_grain import pipeline as grain_pipeline
 from .module2_disease import pipeline as disease_pipeline
 
@@ -80,6 +82,29 @@ async def predict_disease(file: UploadFile = File(...)) -> dict:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         logger.exception("Ошибка анализа растения")
+        raise HTTPException(500, f"Ошибка анализа: {exc}") from exc
+
+
+@app.post("/predict/auto")
+async def predict_auto(file: UploadFile = File(...)) -> dict:
+    """Сам определяет, что на фото (зерно или растение), и запускает нужный
+    модуль. Пользователю не нужно выбирать вручную."""
+    data = await _read_image(file)
+    try:
+        arr = np.frombuffer(data, np.uint8)
+        image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if image is None:
+            raise ValueError("Не удалось прочитать изображение")
+        module = router.detect_module(image)
+        result = (
+            grain_pipeline.analyze(data) if module == "grain" else disease_pipeline.analyze(data)
+        )
+        result["detected_module"] = module
+        return result
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Ошибка авто-анализа")
         raise HTTPException(500, f"Ошибка анализа: {exc}") from exc
 
 

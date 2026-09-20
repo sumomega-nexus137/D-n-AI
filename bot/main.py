@@ -11,11 +11,10 @@ from io import BytesIO
 
 import httpx
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
-    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -36,7 +35,7 @@ REQUEST_TIMEOUT = float(os.environ.get("BOT_REQUEST_TIMEOUT", 90))
 
 WELCOME = (
     "<b>D-n-AI — агроскан</b>\n\n"
-    "Пришлите фото — разберу и подскажу, что делать:\n\n"
+    "Пришлите фото — я сам определю, что на нём, и разберу:\n\n"
     "🌾 <b>Проба зерна</b> — доли по категориям, предварительный класс, "
     "цена в тенге и как поднять сортность\n"
     "🌱 <b>Лист или растение</b> — болезнь, вредитель или сорняк с мерами обработки\n\n"
@@ -46,61 +45,25 @@ WELCOME = (
     "<i>Как снимать растение:</i> поражённый лист крупным планом, при дневном свете."
 )
 
-CHOOSE_KEYBOARD = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("🌾 Качество зерна", callback_data="grain"),
-            InlineKeyboardButton("🌱 Болезни и сорняки", callback_data="disease"),
-        ]
-    ]
-)
-
 
 async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_html(WELCOME)
 
 
-async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Сохраняем фото и спрашиваем, что именно анализировать."""
-    photo = update.message.photo[-1]
-    context.user_data["file_id"] = photo.file_id
-    await update.message.reply_text(
-        "Что на фото?", reply_markup=CHOOSE_KEYBOARD, reply_to_message_id=update.message.message_id
-    )
-
-
-async def on_document_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    doc = update.message.document
-    if not (doc.mime_type or "").startswith("image/"):
-        await update.message.reply_text("Пришлите, пожалуйста, изображение.")
-        return
-    context.user_data["file_id"] = doc.file_id
-    await update.message.reply_text("Что на фото?", reply_markup=CHOOSE_KEYBOARD)
-
-
-async def on_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-
-    file_id = context.user_data.get("file_id")
-    if not file_id:
-        await query.edit_message_text("Фото не найдено — пришлите его ещё раз.")
-        return
-
-    mode = query.data
-    await query.edit_message_text("Анализирую… это займёт несколько секунд")
-    await context.bot.send_chat_action(query.message.chat_id, ChatAction.TYPING)
+async def _analyze_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE, file_id: str) -> None:
+    """Скачиваем фото, отправляем в /predict/auto (модуль определяется сам)
+    и присылаем разбор."""
+    status = await update.message.reply_text("Анализирую… это займёт несколько секунд")
+    await context.bot.send_chat_action(update.message.chat_id, ChatAction.TYPING)
 
     try:
         tg_file = await context.bot.get_file(file_id)
         buffer = BytesIO()
         await tg_file.download_to_memory(buffer)
-        buffer.seek(0)
 
-        endpoint = "/predict/grain" if mode == "grain" else "/predict/disease"
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             response = await client.post(
-                f"{BACKEND_URL}{endpoint}",
+                f"{BACKEND_URL}/predict/auto",
                 files={"file": ("photo.jpg", buffer.getvalue(), "image/jpeg")},
             )
         response.raise_for_status()
@@ -111,17 +74,30 @@ async def on_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             detail = exc.response.json().get("detail", "")
         except Exception:  # noqa: BLE001
             pass
-        await query.edit_message_text(f"Сервер вернул ошибку. {detail}".strip())
+        await status.edit_text(f"Сервер вернул ошибку. {detail}".strip())
         return
     except Exception:  # noqa: BLE001
         logger.exception("Ошибка запроса к backend")
-        await query.edit_message_text(
+        await status.edit_text(
             "Не удалось связаться с сервером анализа. Попробуйте ещё раз через минуту."
         )
         return
 
-    text = format_grain(data) if mode == "grain" else format_disease(data)
-    await query.edit_message_text(text, parse_mode="HTML")
+    module = data.get("detected_module")
+    text = format_disease(data) if module == "disease" else format_grain(data)
+    await status.edit_text(text, parse_mode="HTML")
+
+
+async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _analyze_file_id(update, context, update.message.photo[-1].file_id)
+
+
+async def on_document_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    doc = update.message.document
+    if not (doc.mime_type or "").startswith("image/"):
+        await update.message.reply_text("Пришлите, пожалуйста, изображение.")
+        return
+    await _analyze_file_id(update, context, doc.file_id)
 
 
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -185,7 +161,6 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.Document.IMAGE, on_document_image))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, on_voice))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
-    app.add_handler(CallbackQueryHandler(on_choice, pattern="^(grain|disease)$"))
 
     logger.info("Бот запущен, backend: %s", BACKEND_URL)
     app.run_polling(allowed_updates=Update.ALL_TYPES)

@@ -30,8 +30,14 @@ async function postImage(path, file) {
   if (PREVIEW) {
     const { DEMO_GRAIN, DEMO_DISEASE } = await import("./demoResults.js");
     await wait(1100);
-    const sample = path.includes("grain") ? DEMO_GRAIN : DEMO_DISEASE;
-    return { ...sample, offline_sample: false, preview_sample: true };
+    const isDisease = path.includes("disease");
+    const sample = isDisease ? DEMO_DISEASE : DEMO_GRAIN;
+    return {
+      ...sample,
+      offline_sample: false,
+      preview_sample: true,
+      detected_module: isDisease ? "disease" : "grain",
+    };
   }
 
   const form = new FormData();
@@ -63,6 +69,9 @@ async function postImage(path, file) {
 
 export const analyzeGrain = (file) => postImage("/predict/grain", file);
 export const analyzeDisease = (file) => postImage("/predict/disease", file);
+// Сам определяет, зерно на фото или растение, и возвращает нужный разбор
+// с полем detected_module.
+export const analyzeAuto = (file) => postImage("/predict/auto", file);
 
 /**
  * Консультант на Gemini. Ключ живёт ТОЛЬКО на backend — сюда уходит лишь

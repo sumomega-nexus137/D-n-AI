@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import UploadZone from "./UploadZone.jsx";
 import GrainResult from "./GrainResult.jsx";
 import DiseaseResult from "./DiseaseResult.jsx";
-import { analyzeDisease, analyzeGrain, ApiError } from "../lib/api.js";
+import { analyzeAuto, ApiError } from "../lib/api.js";
 import { DEMO_DISEASE, DEMO_GRAIN } from "../lib/demoResults.js";
 import { addHistory } from "../lib/store.js";
 import { kzt } from "../lib/format.js";
@@ -108,12 +108,13 @@ export default function Analyze({ initialMode = "grain", onConsult }) {
     setLoading(true);
     setError(null);
     try {
-      const data = mode === "grain" ? await analyzeGrain(file) : await analyzeDisease(file);
+      const data = await analyzeAuto(file);
       setResult(data);
-      saveHistory(mode, data);
+      const detected = data.detected_module || (data.diagnosis ? "disease" : "grain");
+      saveHistory(detected, data);
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
-        setResult(mode === "grain" ? DEMO_GRAIN : DEMO_DISEASE);
+        setResult(mode === "disease" ? DEMO_DISEASE : DEMO_GRAIN);
         setError("offline");
       } else {
         setError(err.message || "Не удалось выполнить анализ");
@@ -124,12 +125,17 @@ export default function Analyze({ initialMode = "grain", onConsult }) {
   };
 
   const tab = TABS[mode];
+  const resultModule = result
+    ? result.detected_module || (result.diagnosis ? "disease" : "grain")
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl px-5 pb-24 pt-28 sm:px-6 sm:pt-32">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white sm:text-4xl">Анализ по фото</h1>
-        <p className="mt-2 text-slate-400">Загрузите снимок — модель разберёт его за несколько секунд.</p>
+        <p className="mt-2 text-slate-400">
+          Загрузите фото зерна или растения — определю сам и разберу за секунды.
+        </p>
       </div>
 
       {/* Переключатель модулей */}
@@ -187,11 +193,18 @@ export default function Analyze({ initialMode = "grain", onConsult }) {
               <LoadingState />
             </motion.div>
           ) : result ? (
-            <div key={mode + (result.offline_sample ? "-demo" : "")}>
-              {mode === "grain" ? (
-                <GrainResult data={result} onConsult={onConsult} />
-              ) : (
+            <div key={resultModule + (result.offline_sample ? "-demo" : "")}>
+              <div className="mb-4 flex items-center gap-2 text-sm text-slate-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-moss-400" />
+                Определено автоматически:{" "}
+                <span className="font-medium text-slate-200">
+                  {resultModule === "disease" ? "растение / лист" : "проба зерна"}
+                </span>
+              </div>
+              {resultModule === "disease" ? (
                 <DiseaseResult data={result} onConsult={onConsult} />
+              ) : (
+                <GrainResult data={result} onConsult={onConsult} />
               )}
             </div>
           ) : null}
