@@ -3,7 +3,7 @@ export default function Logo({ onClick }) {
     <button
       onClick={onClick}
       className="group flex shrink-0 items-center gap-2.5 outline-none"
-      aria-label="D-n-AI — на главную"
+      aria-label="Dän-AI — на главную"
     >
       <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gold-500/15 ring-1 ring-gold-500/25 transition-all group-hover:ring-gold-400/50">
         <span className="absolute inset-0 rounded-xl bg-gold-400/20 blur-md opacity-0 transition-opacity group-hover:opacity-100" />
@@ -18,7 +18,7 @@ export default function Logo({ onClick }) {
         </svg>
       </span>
       <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-        <span className="font-display text-[15px] font-bold tracking-tight text-white">D-n-AI</span>
+        <span className="font-display text-[15px] font-bold tracking-tight text-white">Dän-AI</span>
         <span className="hidden text-[13px] text-slate-500 min-[380px]:inline">агроскан</span>
       </span>
     </button>

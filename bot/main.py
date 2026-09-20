@@ -34,7 +34,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 REQUEST_TIMEOUT = float(os.environ.get("BOT_REQUEST_TIMEOUT", 90))
 
 WELCOME = (
-    "<b>D-n-AI — агроскан</b>\n\n"
+    "<b>Dän-AI — агроскан</b>\n\n"
     "Пришлите фото — я сам определю, что на нём, и разберу:\n\n"
     "🌾 <b>Проба зерна</b> — доли по категориям, предварительный класс, "
     "цена в тенге и как поднять сортность\n"

@@ -1,6 +1,6 @@
 {
-  "name": "D-n-AI — агроскан",
-  "short_name": "D-n-AI",
+  "name": "Dän-AI — агроскан",
+  "short_name": "Dän-AI",
   "description": "Оценка качества зерна и здоровья посевов по фото",
   "start_url": "/",
   "display": "standalone",
