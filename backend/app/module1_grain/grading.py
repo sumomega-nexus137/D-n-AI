@@ -49,6 +49,15 @@ CLEANING_REMOVAL = {
 MIN_GRAINS_FOR_CONFIDENCE = 80
 
 
+def _pct(value: float) -> str:
+    """Процент в русском формате: запятая как разделитель дробной части."""
+    return f"{value:.1f}".replace(".", ",") + "%"
+
+
+def _kzt(value: float) -> str:
+    return f"{value:,.0f}".replace(",", " ") + " ₸"
+
+
 @dataclass
 class Recommendation:
     title: str
@@ -140,7 +149,7 @@ def _build_recommendations(
             Recommendation(
                 title="Просеять партию",
                 detail=(
-                    f"Сорная примесь {foreign:.1f}% — выше нормы 2%. Просеивание на "
+                    f"Сорная примесь {_pct(foreign)} — выше нормы 2%. Просеивание на "
                     "решётной очистке уберёт основную часть сора и поднимет сортность."
                 ),
                 priority="high",
@@ -149,7 +158,7 @@ def _build_recommendations(
 
     if broken + thin > 5.0:
         detail = (
-            f"Битого и щуплого зерна {broken + thin:.1f}%. Дочистка на сепараторе "
+            f"Битого и щуплого зерна {_pct(broken + thin)}. Дочистка на сепараторе "
             "с калибровкой по размеру отсеет мелкую и дроблёную фракцию."
         )
         recs.append(
@@ -166,7 +175,7 @@ def _build_recommendations(
             Recommendation(
                 title="Проверить условия хранения",
                 detail=(
-                    f"Проросшего зерна {sprouted:.1f}%. Очисткой это не исправить — "
+                    f"Проросшего зерна {_pct(sprouted)}. Очисткой это не исправить — "
                     "проверьте влажность и вентиляцию склада, партию продавайте быстрее."
                 ),
                 priority="high" if sprouted > 3.0 else "medium",
@@ -179,7 +188,7 @@ def _build_recommendations(
                 title=f"Можно поднять до {potential_grade} класса",
                 detail=(
                     f"После очистки партия проходит под {potential_grade} класс. "
-                    f"Прибавка около {gain:,.0f} ₸ за тонну.".replace(",", " ")
+                    f"Прибавка около {_kzt(gain)} за тонну."
                 ),
                 priority="high",
                 gain_kzt_per_ton=gain,

@@ -244,3 +244,7 @@ __marimo__/
 # тестовые артефакты сегментации
 /scripts/out_crops/
 /scripts/out_synthetic_input.png
+
+# Frontend
+/webapp/node_modules/
+/webapp/dist/

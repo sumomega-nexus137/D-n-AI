@@ -1,0 +1,10 @@
+{
+  "name": "D-n-AI — агроскан",
+  "short_name": "D-n-AI",
+  "description": "Оценка качества зерна и здоровья посевов по фото",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090c",
+  "theme_color": "#07090c",
+  "lang": "ru"
+}
