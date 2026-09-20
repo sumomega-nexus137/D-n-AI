@@ -249,4 +249,6 @@ __marimo__/
 
 # Frontend
 /webapp/node_modules/
-/webapp/dist/
+# webapp/dist НЕ игнорируем: собранный сайт закоммичен, чтобы backend раздавал
+# его без сборки (нужно для запуска в Colab одной командой). Пересобирается
+# командой `npm run build` в папке webapp после правок фронтенда.
