@@ -85,22 +85,51 @@ async def predict_disease(file: UploadFile = File(...)) -> dict:
         raise HTTPException(500, f"Ошибка анализа: {exc}") from exc
 
 
+# Порог уверенности модели болезней для «крупного не-зелёного объекта»:
+# ниже — считаем, что это не наш объект (постороннее фото), и не выдаём диагноз.
+_DISEASE_ACCEPT_CONF = 0.5
+
+_UNRECOGNIZED = {
+    "detected_module": "unknown",
+    "ok": False,
+    "message": (
+        "На фото не удалось распознать пробу зерна или растение. "
+        "Пришлите фото пробы зерна (тонким слоем на контрастном фоне, сверху) "
+        "или поражённого листа крупным планом при дневном свете."
+    ),
+}
+
+
 @app.post("/predict/auto")
 async def predict_auto(file: UploadFile = File(...)) -> dict:
-    """Сам определяет, что на фото (зерно или растение), и запускает нужный
-    модуль. Пользователю не нужно выбирать вручную."""
+    """Сам определяет, что на фото (зерно / растение / не наше), и запускает
+    нужный модуль. Постороннее фото не выдаётся за диагноз."""
     data = await _read_image(file)
     try:
         arr = np.frombuffer(data, np.uint8)
         image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if image is None:
             raise ValueError("Не удалось прочитать изображение")
+
         module = router.detect_module(image)
-        result = (
-            grain_pipeline.analyze(data) if module == "grain" else disease_pipeline.analyze(data)
-        )
-        result["detected_module"] = module
-        return result
+
+        if module == "grain":
+            result = grain_pipeline.analyze(data)
+            if not result.get("total_grains"):
+                return dict(_UNRECOGNIZED)
+            result["detected_module"] = "grain"
+            return result
+
+        if module in ("disease", "maybe_plant"):
+            result = disease_pipeline.analyze(data)
+            conf = (result.get("diagnosis") or {}).get("confidence", 0.0)
+            # для «сомнительного» объекта требуем уверенность выше порога
+            if module == "maybe_plant" and conf < _DISEASE_ACCEPT_CONF:
+                return dict(_UNRECOGNIZED)
+            result["detected_module"] = "disease"
+            return result
+
+        return dict(_UNRECOGNIZED)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:  # noqa: BLE001

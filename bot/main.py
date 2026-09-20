@@ -84,6 +84,13 @@ async def _analyze_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE, f
         return
 
     module = data.get("detected_module")
+    if module == "unknown" or data.get("ok") is False:
+        await status.edit_text(
+            data.get("message")
+            or "На фото не удалось распознать пробу зерна или растение. "
+            "Пришлите фото пробы зерна или поражённого листа."
+        )
+        return
     text = format_disease(data) if module == "disease" else format_grain(data)
     await status.edit_text(text, parse_mode="HTML")
 

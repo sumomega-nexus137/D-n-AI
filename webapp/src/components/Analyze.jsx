@@ -111,7 +111,7 @@ export default function Analyze({ initialMode = "grain", onConsult }) {
       const data = await analyzeAuto(file);
       setResult(data);
       const detected = data.detected_module || (data.diagnosis ? "disease" : "grain");
-      saveHistory(detected, data);
+      if (detected === "grain" || detected === "disease") saveHistory(detected, data);
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
         setResult(mode === "disease" ? DEMO_DISEASE : DEMO_GRAIN);
@@ -191,6 +191,27 @@ export default function Analyze({ initialMode = "grain", onConsult }) {
           {loading ? (
             <motion.div key="loading" exit={{ opacity: 0 }}>
               <LoadingState />
+            </motion.div>
+          ) : result && resultModule === "unknown" ? (
+            <motion.div
+              key="unknown"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass flex flex-col items-center gap-4 p-10 text-center"
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500/15 text-gold-300 ring-1 ring-gold-500/25">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-7 w-7">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v5m0 3h.01" strokeLinecap="round" />
+                </svg>
+              </span>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Не распознали фото</h3>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-400">
+                  {result.message ||
+                    "На фото не видно пробы зерна или растения. Пришлите пробу зерна тонким слоем или поражённый лист крупным планом."}
+                </p>
+              </div>
             </motion.div>
           ) : result ? (
             <div key={resultModule + (result.offline_sample ? "-demo" : "")}>

@@ -15,9 +15,10 @@ import numpy as np
 
 from ..module1_grain.segmentation import segment_grains
 
-GREEN_FRACTION_MIN = 0.12   # выше — почти наверняка растение
+GREEN_FRACTION_MIN = 0.10   # выше — почти наверняка растение
 BIG_OBJECT_FRACTION = 0.22  # один объект занимает столько кадра — это лист/растение
-MIN_GRAINS = 8              # столько частиц — это проба зерна
+MIN_GRAINS = 12             # столько частиц — это проба зерна (в т.ч. насыпанная горкой)
+GRAIN_WARMTH_MIN = 5.0      # зерно тёплого цвета (R заметно больше B); серое/чужое — нет
 
 
 def _green_fraction(image_bgr: np.ndarray) -> float:
@@ -41,15 +42,44 @@ def _largest_blob_fraction(image_bgr: np.ndarray) -> float:
     return float(largest) / mask.size
 
 
+def _crops_are_warm(crops) -> bool:
+    """Тёплый ли цвет у найденных частиц (зерно жёлто-коричневое: R > B)."""
+    diffs = []
+    for c in crops[:120]:  # хватит выборки
+        img = c.image
+        if img.size == 0:
+            continue
+        b = float(img[..., 0].mean())
+        r = float(img[..., 2].mean())
+        diffs.append(r - b)
+    if not diffs:
+        return False
+    return float(np.median(diffs)) >= GRAIN_WARMTH_MIN
+
+
 def detect_module(image_bgr: np.ndarray) -> str:
-    """Возвращает 'grain' или 'disease'."""
+    """Возвращает один из вариантов:
+    - 'grain'       — проба зерна (много мелких частиц), даже насыпанная горкой;
+    - 'disease'     — растение/лист (много зелёного);
+    - 'maybe_plant' — один крупный не-зелёный объект: возможно лист, а возможно
+                      постороннее фото — решаем по уверенности модели болезней;
+    - 'unknown'     — не похоже ни на зерно, ни на растение.
+    """
+    # 1) зелёное — это растение
     if _green_fraction(image_bgr) >= GREEN_FRACTION_MIN:
         return "disease"
-    if _largest_blob_fraction(image_bgr) >= BIG_OBJECT_FRACTION:
-        return "disease"
+    # 2) много мелких частиц — проба зерна (сначала считаем зёрна, потом уже
+    #    смотрим на «один большой объект», иначе горка зерна ошибочно уходит в лист).
+    #    Дополнительно проверяем «тёплый» цвет самих частиц: серые/чужие текстуры
+    #    тоже дробятся на сегменты, но зерно жёлто-коричневое.
     try:
-        if len(segment_grains(image_bgr)) >= MIN_GRAINS:
-            return "grain"
-    except Exception:  # noqa: BLE001 — при любой ошибке сегментации считаем растением
-        return "disease"
-    return "disease"
+        crops = segment_grains(image_bgr)
+    except Exception:  # noqa: BLE001
+        crops = []
+    if len(crops) >= MIN_GRAINS and _crops_are_warm(crops):
+        return "grain"
+    # 3) один крупный объект без зелени — вероятно лист (но проверим уверенностью)
+    if _largest_blob_fraction(image_bgr) >= BIG_OBJECT_FRACTION:
+        return "maybe_plant"
+    # 4) ничего из этого
+    return "unknown"
