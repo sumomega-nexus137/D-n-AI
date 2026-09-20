@@ -16,6 +16,25 @@
 
 🚧 В разработке (хакатон, дедлайн 21.09.2026).
 
+**Готово:** сбор и разметка датасетов, извлечение эмбеддингов DINOv2,
+обучение и валидация обеих голов-классификаторов, OpenCV-сегментация
+зёрен, сравнение с Gemini zero-shot.
+**В работе:** backend, веб-интерфейс, Telegram-бот, деплой.
+
+## Результаты
+
+- **Модуль 1 (качество зерна):** accuracy 98.84%, macro-F1 0.9884 на
+  held-out тесте (5 классов).
+- **Модуль 2 (болезни/вредители/сорняки):** accuracy 85.71%, macro-F1
+  0.854 на held-out тесте (24 класса).
+- **Сравнение с Gemini (zero-shot, без дообучения):** наша
+  специализированная модель точнее определяет повреждённость/битость
+  зерна — ключевую метрику задачи 3.3 — и не уступает Gemini в
+  распознавании болезней листа по фото.
+
+Подробности обучения — `docs/TRAINING_RESULTS.md`, сегментация —
+`docs/SEGMENTATION.md`.
+
 ## Архитектура
 
 Фото → (только Модуль 1: OpenCV-сегментация зёрен, классический метод, без
@@ -25,17 +44,15 @@
 
 ## Датасеты
 
-**Модуль 1 (зерно):**
-- [GrainSpace](https://github.com/hellodfan/GrainSpace)
-- GrainSet (Nature Scientific Data, 2023)
-- Kaggle: wheat seed classification / grain quality
+**Модуль 1 (зерно):** [GrainSet](https://github.com/hellodfan/GrainSet)
+(Nature Scientific Data, 2023) — 200K фото зерна пшеницы, CC BY 4.0.
 
-**Модуль 2 (болезни/сорняки):**
-- [PlantDoc](https://github.com/pratikkayal/PlantDoc-Dataset)
-- Roboflow Universe: wheat disease / wheat weed датасеты
-- PlantVillage (только как дополнение, не основа — нет пшеницы, лабораторный фон)
+**Модуль 2 (болезни/вредители/сорняки):**
+- `kushagra3204/wheat-plant-diseases` и `olyadgetch/wheat-leaf-dataset` (Kaggle) — болезни и вредители пшеницы
+- `vbookshelf/v2-plant-seedlings-dataset` (Kaggle) — сорняки
 
-Подробности и лицензии источников — см. `docs/DATASETS.md` (будет добавлен).
+Подробности, объёмы, лицензии источников и таксономия классов —
+`docs/DATASETS.md`.
 
 ## Структура репозитория
 
