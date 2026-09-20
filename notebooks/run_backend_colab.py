@@ -25,9 +25,14 @@ import subprocess
 import time
 import urllib.request
 
-# 1. Забираем код с GitHub (модели и собранный сайт уже внутри репозитория)
+# 1. Забираем код с GitHub (модели и собранный сайт уже внутри репозитория).
+#    Если папка уже есть — подтягиваем свежую версию, чтобы обновления дизайна
+#    подхватились без пересоздания среды.
 if not os.path.isdir("D-n-AI"):
     subprocess.run(["git", "clone", "-b", BRANCH, REPO], check=True)
+else:
+    subprocess.run(["git", "-C", "D-n-AI", "fetch", "origin", BRANCH], check=True)
+    subprocess.run(["git", "-C", "D-n-AI", "reset", "--hard", f"origin/{BRANCH}"], check=True)
 os.chdir("D-n-AI")
 
 # 2. Ставим зависимости backend'а + pyngrok

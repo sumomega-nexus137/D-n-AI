@@ -2,42 +2,48 @@ import { motion } from "framer-motion";
 import { kzt } from "../lib/format.js";
 
 const PRIORITY = {
-  high: { label: "Сделать сейчас", cls: "bg-rose-500/12 text-rose-300 ring-1 ring-rose-500/25" },
-  medium: { label: "Стоит учесть", cls: "bg-grain-500/12 text-grain-400 ring-1 ring-grain-500/25" },
-  low: { label: "На заметку", cls: "bg-white/[0.06] text-slate-300 ring-1 ring-white/10" },
+  high: { dot: "bg-rose-400", label: "Сделать сейчас", chip: "text-rose-300 border-rose-400/30 bg-rose-400/10" },
+  medium: { dot: "bg-gold-400", label: "Стоит учесть", chip: "text-gold-300 border-gold-400/30 bg-gold-400/10" },
+  low: { dot: "bg-moss-400", label: "На заметку", chip: "text-moss-300 border-moss-400/30 bg-moss-400/10" },
 };
 
 export default function Recommendations({ items }) {
   if (!items?.length) return null;
-
   return (
-    <div className="card p-5 sm:p-6">
-      <h3 className="mb-4 text-base font-semibold text-white">Что делать</h3>
-      <ul className="space-y-3">
-        {items.map((rec, i) => {
-          const tone = PRIORITY[rec.priority] ?? PRIORITY.low;
-          return (
-            <motion.li
-              key={rec.title}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.06 * i, duration: 0.35 }}
-              className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-medium text-white">{rec.title}</h4>
-                <span className={`pill ${tone.cls}`}>{tone.label}</span>
-                {rec.gain_kzt_per_ton ? (
-                  <span className="pill bg-leaf-500/12 text-leaf-400 ring-1 ring-leaf-500/25">
-                    +{kzt(rec.gain_kzt_per_ton)}/т
+    <div className="space-y-3">
+      {items.map((rec, i) => {
+        const p = PRIORITY[rec.priority] ?? PRIORITY.medium;
+        return (
+          <motion.div
+            key={rec.title + i}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 * i, duration: 0.5 }}
+            className="glass p-5"
+          >
+            <div className="flex items-start gap-3.5">
+              <span className="relative mt-1 flex h-2.5 w-2.5 shrink-0">
+                <span className={`absolute inline-flex h-full w-full rounded-full ${p.dot} opacity-40 ${rec.priority === "high" ? "animate-ping" : ""}`} />
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${p.dot}`} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-[15px] font-semibold text-white">{rec.title}</h4>
+                  <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${p.chip}`}>
+                    {p.label}
                   </span>
-                ) : null}
+                  {rec.gain_kzt_per_ton ? (
+                    <span className="rounded-full border border-moss-400/30 bg-moss-400/10 px-2 py-0.5 text-[11px] font-semibold text-moss-300">
+                      +{kzt(rec.gain_kzt_per_ton)}/т
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{rec.detail}</p>
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{rec.detail}</p>
-            </motion.li>
-          );
-        })}
-      </ul>
+            </div>
+          </motion.div>
+        );
+      })}
     </div>
   );
 }

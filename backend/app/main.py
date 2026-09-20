@@ -1,10 +1,12 @@
 """FastAPI backend: два эндпоинта анализа фото + служебные."""
 
+import asyncio
 import logging
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from .common import config, embedder
 from .module1_grain import pipeline as grain_pipeline
@@ -79,6 +81,68 @@ async def predict_disease(file: UploadFile = File(...)) -> dict:
     except Exception as exc:  # noqa: BLE001
         logger.exception("Ошибка анализа растения")
         raise HTTPException(500, f"Ошибка анализа: {exc}") from exc
+
+
+class ChatRequest(BaseModel):
+    message: str
+    context: dict | None = None
+
+
+def _consultant_prompt(message: str, context: dict | None) -> str:
+    """Собираем промпт для Gemini: роль агронома + контекст последнего анализа."""
+    parts = [
+        "Ты — агроном-консультант сервиса D-n-AI для фермеров Казахстана. "
+        "Отвечай по-русски, коротко и по делу (до 6 предложений), практично. "
+        "Не выдумывай точные дозировки препаратов — советуй уточнить их у "
+        "агронома по регламенту применения.",
+    ]
+    if context:
+        summary = []
+        if context.get("grade_label"):
+            summary.append(f"класс зерна: {context['grade_label']}")
+        if context.get("price_kzt_per_ton"):
+            summary.append(f"цена: ~{context['price_kzt_per_ton']:.0f} ₸/т")
+        cats = context.get("categories") or []
+        if cats:
+            summary.append(
+                "состав: "
+                + ", ".join(f"{c['label']} {c['percent']:.1f}%" for c in cats if c.get("percent"))
+            )
+        diag = context.get("diagnosis")
+        if diag:
+            summary.append(
+                f"диагноз листа: {diag.get('name_ru')} "
+                f"({round((diag.get('confidence') or 0) * 100)}%)"
+            )
+        if summary:
+            parts.append("Результат последнего анализа — " + "; ".join(summary) + ".")
+    parts.append(f"Вопрос фермера: {message}")
+    return "\n\n".join(parts)
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest) -> dict:
+    if not req.message.strip():
+        raise HTTPException(400, "Пустой вопрос")
+    if not config.GEMINI_API_KEY:
+        raise HTTPException(
+            503,
+            "Консультант недоступен: на сервере не задан GEMINI_API_KEY.",
+        )
+    try:
+        import google.generativeai as genai
+
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        model = genai.GenerativeModel(config.GEMINI_MODEL)
+        result = await asyncio.to_thread(
+            model.generate_content, _consultant_prompt(req.message, req.context)
+        )
+        return {"reply": (result.text or "").strip()}
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Ошибка консультанта Gemini")
+        raise HTTPException(502, "Консультант временно недоступен, попробуйте позже.") from exc
 
 
 # Раздача собранного сайта. Монтируется последней, чтобы не перехватывать /health

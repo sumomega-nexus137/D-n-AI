@@ -15,6 +15,7 @@ MODELS_DIR = Path(os.environ.get("MODELS_DIR", PROJECT_ROOT / "models"))
 WEBAPP_DIST = Path(os.environ.get("WEBAPP_DIST", PROJECT_ROOT / "webapp" / "dist"))
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
