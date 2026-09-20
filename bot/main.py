@@ -31,6 +31,7 @@ logger = logging.getLogger("dnai-bot")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000").rstrip("/")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 REQUEST_TIMEOUT = float(os.environ.get("BOT_REQUEST_TIMEOUT", 90))
 
 WELCOME = (
@@ -107,6 +108,57 @@ async def on_document_image(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await _analyze_file_id(update, context, doc.file_id)
 
 
+VOICE_PROMPT = (
+    "Это аудио — вопрос фермера, на казахском ИЛИ на русском языке. "
+    "Сначала внимательно распознай сказанное (учти казахскую речь), затем "
+    "ответь на том же языке, на котором был вопрос: коротко и по делу, "
+    "до 6 предложений, как агроном-консультант из Казахстана. "
+    "Если вопрос про качество зерна или болезни растений — добавь, что можно "
+    "прислать фото боту для точной оценки. Отвечай обычным текстом, без markdown."
+)
+
+
+def _extract_text(result) -> str:
+    """Безопасно достаём текст ответа Gemini: result.text бросает исключение,
+    если ответ пустой/заблокирован, поэтому пробуем и кандидатов."""
+    try:
+        text = (result.text or "").strip()
+        if text:
+            return text
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        for cand in getattr(result, "candidates", []) or []:
+            parts = getattr(getattr(cand, "content", None), "parts", []) or []
+            joined = " ".join(getattr(p, "text", "") for p in parts).strip()
+            if joined:
+                return joined
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+async def _voice_reply(mime_type: str, audio_bytes: bytes) -> str:
+    """Аудио -> Gemini, с одним повтором при пустом ответе."""
+    import google.generativeai as genai
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(GEMINI_MODEL)
+    payload = [VOICE_PROMPT, {"mime_type": mime_type, "data": audio_bytes}]
+
+    for attempt in range(2):
+        try:
+            result = await asyncio.to_thread(model.generate_content, payload)
+            text = _extract_text(result)
+            if text:
+                return text
+            logger.warning("Пустой ответ Gemini на голосовое (попытка %d)", attempt + 1)
+        except Exception:  # noqa: BLE001
+            logger.exception("Ошибка Gemini на голосовом (попытка %d)", attempt + 1)
+        await asyncio.sleep(1.0)
+    return ""
+
+
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Голосовое -> напрямую в Gemini Flash (он и распознаёт речь, и отвечает)."""
     if not GEMINI_API_KEY:
@@ -123,29 +175,13 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await tg_file.download_to_memory(buffer)
     audio_bytes = buffer.getvalue()
 
-    prompt = (
-        "Ты — агроном-консультант для фермеров Казахстана. Пользователь задал "
-        "вопрос голосом (на русском или казахском). Пойми вопрос и ответь на том "
-        "же языке, коротко и по делу — не больше 6 предложений. Если вопрос про "
-        "качество зерна или болезни растений, упомяни, что можно прислать фото "
-        "боту для точной оценки."
-    )
-
-    try:
-        import google.generativeai as genai
-
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        result = await asyncio.to_thread(
-            model.generate_content,
-            [prompt, {"mime_type": voice.mime_type or "audio/ogg", "data": audio_bytes}],
-        )
-        await update.message.reply_text(result.text)
-    except Exception:  # noqa: BLE001
-        logger.exception("Ошибка обращения к Gemini")
+    reply = await _voice_reply(voice.mime_type or "audio/ogg", audio_bytes)
+    if reply:
+        await update.message.reply_text(reply)
+    else:
         await update.message.reply_text(
-            "Не получилось обработать голосовое сообщение. Попробуйте ещё раз "
-            "или напишите вопрос текстом."
+            "Не расслышал вопрос. Запишите ещё раз чуть длиннее и ближе к "
+            "микрофону, без фонового шума — или напишите вопрос текстом."
         )
 
 
