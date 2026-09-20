@@ -1,81 +1,91 @@
-"""Запуск живого сайта D-n-AI из Google Colab через ngrok.
+"""Запуск ВСЕГО D-n-AI из Google Colab одной ячейкой: сайт + модель +
+ИИ-консультант + Telegram-бот. Через ngrok сайт получает публичную ссылку.
 
-Backend сам раздаёт и сайт, и API, поэтому одна ngrok-ссылка = весь рабочий
-сайт с настоящей моделью. Colab бесплатный, есть GPU — анализ быстрый.
+Все ключи вводятся ниже и живут только в этом Colab — в код и git не попадают.
 
 Как пользоваться:
-1. Открой https://colab.research.google.com → New notebook.
-2. Скопируй ВЕСЬ этот код в одну ячейку.
-3. Впиши свой ngrok-токен и статический домен в NGROK_AUTHTOKEN / NGROK_DOMAIN.
-4. Runtime → Run all. Через 1-2 минуты появится ссылка — открой её.
-5. Держи ноутбук запущенным, пока показываешь сайт. Закроешь — ссылка гаснет.
+1. Открой https://colab.research.google.com → New notebook (лучше T4 GPU).
+2. Скопируй весь код в одну ячейку.
+3. Впиши три значения ниже.
+4. Runtime → Run all. Через 1-2 минуты появится ссылка на сайт.
+5. Держи ноутбук запущенным, пока показываешь сайт/бота.
 """
 
 # ── ВПИШИ СВОЁ ───────────────────────────────────────────────────────────────
-NGROK_AUTHTOKEN = "ВСТАВЬ_СВОЙ_ТОКЕН"  # ngrok → Your Authtoken (только токен)
-# Домен НЕ нужен: на бесплатном плане ngrok выдаёт случайную ссылку сам
-# (кастомные домены у ngrok теперь только на платном плане).
+NGROK_AUTHTOKEN = "ВСТАВЬ"      # ngrok → Your Authtoken (обязательно для сайта)
+TELEGRAM_BOT_TOKEN = "ВСТАВЬ"  # @BotFather → токен (оставь пустым "", если бот не нужен)
+GEMINI_API_KEY = "ВСТАВЬ"      # https://aistudio.google.com/apikey (для консультанта и голоса)
 # ─────────────────────────────────────────────────────────────────────────────
-
-REPO = "https://github.com/sumomega-nexus137/D-n-AI.git"
-BRANCH = "claude/agritech-ai-hackathon-tlv08x"
 
 import os
 import subprocess
 import time
 import urllib.request
 
-# 1. Забираем код с GitHub (модели и собранный сайт уже внутри репозитория).
-#    Если папка уже есть — подтягиваем свежую версию, чтобы обновления дизайна
-#    подхватились без пересоздания среды.
-if not os.path.isdir("D-n-AI"):
-    subprocess.run(["git", "clone", "-b", BRANCH, REPO], check=True)
-else:
-    subprocess.run(["git", "-C", "D-n-AI", "fetch", "origin", BRANCH], check=True)
-    subprocess.run(["git", "-C", "D-n-AI", "reset", "--hard", f"origin/{BRANCH}"], check=True)
-os.chdir("D-n-AI")
+REPO = "https://github.com/sumomega-nexus137/D-n-AI.git"
+BRANCH = "claude/agritech-ai-hackathon-tlv08x"
 
-# 2. Ставим зависимости backend'а + pyngrok
+# гасим прошлый запуск, если был
+subprocess.run(["pkill", "-f", "uvicorn"])
+subprocess.run(["pkill", "-f", "bot/main.py"])
+try:
+    from pyngrok import ngrok
+
+    ngrok.kill()
+except Exception:
+    pass
+
+# всегда берём свежий код (модели и собранный сайт уже внутри репозитория)
+subprocess.run(["rm", "-rf", "D-n-AI"])
+subprocess.run(["git", "clone", "-b", BRANCH, REPO], check=True)
+os.chdir("/content/D-n-AI")
+
+# зависимости backend'а и бота
 subprocess.run(
-    ["pip", "install", "-q", "-r", "backend/requirements.txt", "pyngrok"],
+    ["pip", "install", "-q", "-r", "backend/requirements.txt", "-r", "bot/requirements.txt", "pyngrok"],
     check=True,
 )
 
-# 3. Запускаем backend в фоне (при первом старте качается DINOv2 ~84 МБ)
-server = subprocess.Popen(
-    ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 1) backend: сайт + модель + ИИ-консультант (ключ Gemini — в окружении процесса)
+backend_env = {**os.environ, "GEMINI_API_KEY": GEMINI_API_KEY}
+subprocess.Popen(
+    ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+    env=backend_env,
 )
-
-# 4. Ждём, пока backend поднимется
-print("Запускаю backend (качаю веса модели)…")
+print("Поднимаю backend (качаю модель)…")
 ready = False
-for _ in range(80):
+for _ in range(90):
     try:
         urllib.request.urlopen("http://localhost:8000/health", timeout=2)
         ready = True
         break
     except Exception:
         time.sleep(3)
+print("backend готов" if ready else "!! backend не поднялся — смотри логи выше")
 
-if not ready:
-    raise RuntimeError("Backend не поднялся — посмотри логи ячейки выше.")
-print("Backend готов.")
+# 2) Telegram-бот: фото → тот же разбор, голос → Gemini. Ходит в backend локально.
+if TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_TOKEN != "ВСТАВЬ":
+    bot_env = {
+        **os.environ,
+        "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
+        "GEMINI_API_KEY": GEMINI_API_KEY,
+        "BACKEND_URL": "http://localhost:8000",
+    }
+    subprocess.Popen(["python", "bot/main.py"], env=bot_env)
+    print("Telegram-бот запущен.")
+else:
+    print("Токен бота не задан — бот пропущен (сайт работает).")
 
-# 5. Открываем публичный адрес на постоянном ngrok-домене
+# 3) публичная ссылка на сайт
 from pyngrok import conf, ngrok
 
 conf.get_default().auth_token = NGROK_AUTHTOKEN
-tunnel = ngrok.connect(addr=8000)
-url = tunnel.public_url
-
+url = ngrok.connect(addr=8000).public_url
 print("\n" + "=" * 60)
 print("  САЙТ РАБОТАЕТ:", url)
-print("  Проверка API:", url + "/health")
-print("  При первом заходе ngrok покажет предупреждение —")
-print("  нажми 'Visit Site', дальше всё откроется нормально.")
-print("  НЕ закрывай эту вкладку, пока показываешь сайт.")
+print("  При первом заходе на странице ngrok нажми 'Visit Site'.")
+print("  Не закрывай эту вкладку, пока показываешь сайт и бота.")
 print("=" * 60)
 
-# 6. Держим ячейку живой
 while True:
     time.sleep(3600)
