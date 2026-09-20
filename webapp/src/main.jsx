@@ -9,12 +9,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>
 );
 
-// Офлайн-заглушка: кешируем оболочку приложения и показываем понятный
-// экран вместо белой страницы, когда связи нет.
+// Service worker намеренно НЕ регистрируем: при перевыкладке он отдавал
+// закешированную старую оболочку («сайт не обновляется»). Заодно снимаем
+// регистрацию и чистим кеши, если он остался от прошлых версий на этом origin.
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      /* офлайн-режим просто не включится, приложение работает как обычно */
-    });
+  navigator.serviceWorker.getRegistrations?.().then((regs) => {
+    regs.forEach((r) => r.unregister());
   });
+  if (window.caches) {
+    caches.keys?.().then((keys) => keys.forEach((k) => caches.delete(k)));
+  }
 }
