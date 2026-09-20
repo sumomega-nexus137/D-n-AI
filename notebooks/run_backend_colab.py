@@ -12,8 +12,9 @@ Backend сам раздаёт и сайт, и API, поэтому одна ngrok
 """
 
 # ── ВПИШИ СВОЁ ───────────────────────────────────────────────────────────────
-NGROK_AUTHTOKEN = "ВСТАВЬ_СВОЙ_ТОКЕН"          # ngrok → Your Authtoken
-NGROK_DOMAIN = "ВСТАВЬ_СВОЙ_ДОМЕН.ngrok-free.dev"  # ngrok → Domains (бесплатный)
+NGROK_AUTHTOKEN = "ВСТАВЬ_СВОЙ_ТОКЕН"  # ngrok → Your Authtoken (только токен)
+# Домен НЕ нужен: на бесплатном плане ngrok выдаёт случайную ссылку сам
+# (кастомные домены у ngrok теперь только на платном плане).
 # ─────────────────────────────────────────────────────────────────────────────
 
 REPO = "https://github.com/sumomega-nexus137/D-n-AI.git"
@@ -59,9 +60,9 @@ print("Backend готов.")
 from pyngrok import conf, ngrok
 
 conf.get_default().auth_token = NGROK_AUTHTOKEN
-ngrok.connect(addr=8000, domain=NGROK_DOMAIN)
+tunnel = ngrok.connect(addr=8000)
+url = tunnel.public_url
 
-url = f"https://{NGROK_DOMAIN}"
 print("\n" + "=" * 60)
 print("  САЙТ РАБОТАЕТ:", url)
 print("  Проверка API:", url + "/health")
