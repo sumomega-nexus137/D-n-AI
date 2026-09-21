@@ -17,6 +17,9 @@ from .module2_disease import pipeline as disease_pipeline
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dnai")
 
+# Метка сборки: видно в /health, чтобы сразу понять, свежий ли код запущен
+APP_VERSION = "2026.09.21"
+
 app = FastAPI(
     title="D-n-AI — агроскан",
     description="Качество зерна и здоровье растений по фото",
@@ -58,7 +61,16 @@ async def _read_image(file: UploadFile) -> bytes:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "demo_mode": config.DEMO_MODE}
+    """Статус + самодиагностика: сразу видно, свежий ли код запущен и
+    настроен ли консультант. Нужно, чтобы не гадать при отладке деплоя."""
+    paths = sorted({getattr(r, "path", "") for r in app.routes})
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "demo_mode": config.DEMO_MODE,
+        "gemini_configured": bool(config.GEMINI_API_KEY),
+        "endpoints": [p for p in paths if p.startswith(("/predict", "/chat", "/health"))],
+    }
 
 
 @app.post("/predict/grain")

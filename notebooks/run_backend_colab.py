@@ -61,7 +61,18 @@ for _ in range(90):
         break
     except Exception:
         time.sleep(3)
-print("backend готов" if ready else "!! backend не поднялся — смотри логи выше")
+if ready:
+    # Самопроверка: какая версия крутится и есть ли нужные эндпоинты
+    import json as _json
+
+    info = _json.loads(urllib.request.urlopen("http://localhost:8000/health").read())
+    print("backend готов | версия:", info.get("version"))
+    print("  эндпоинты :", ", ".join(info.get("endpoints", [])))
+    print("  Gemini ключ:", "задан" if info.get("gemini_configured") else "НЕ ЗАДАН")
+    if "/chat" not in info.get("endpoints", []):
+        print("  !! /chat отсутствует — запущен старый код, консультант не заработает")
+else:
+    print("!! backend не поднялся — смотри логи выше")
 
 # 2) Telegram-бот: фото → тот же разбор, голос → Gemini. Ходит в backend локально.
 if TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_TOKEN != "ВСТАВЬ":

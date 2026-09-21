@@ -60,10 +60,20 @@ export default function Consultant({ context }) {
       const { reply } = await askConsultant(q, context ?? null);
       setMessages((m) => [...m, { role: "assistant", text: reply || "…" }]);
     } catch (err) {
-      const msg =
-        err instanceof ApiError && err.status === 0
-          ? "Нет связи с сервером. Проверьте, что backend запущен."
-          : err.message || "Консультант временно недоступен.";
+      let msg = err.message || "Консультант временно недоступен.";
+      if (err instanceof ApiError) {
+        if (err.status === 0) {
+          msg = "Нет связи с сервером. Проверьте, что backend запущен.";
+        } else if (err.status === 404) {
+          msg =
+            "На сервере нет эндпоинта /chat — запущена старая версия backend. " +
+            "Перезапустите сервер со свежим кодом (git pull / заново ячейку Colab).";
+        } else if (err.status === 503) {
+          msg =
+            "Консультант не настроен: на сервере не задан GEMINI_API_KEY. " +
+            "Добавьте ключ и перезапустите backend.";
+        }
+      }
       setMessages((m) => [...m, { role: "assistant", text: msg, error: true }]);
     } finally {
       setBusy(false);
