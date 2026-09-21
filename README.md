@@ -56,49 +56,127 @@ Dän-AI отвечает на все три за несколько секунд
 DINOv2 даёт лучше и воспроизводимее, чем своя сеть с нуля. Обучается ровно один
 слой (файл ~16–75 КБ, лежит в репозитории).
 
-## 3. Инструкция по запуску
+## 3. Быстрый старт и запуск
 
-Нужен **Python 3.11+**. Node НЕ нужен — собранный сайт уже в репозитории, его
-раздаёт backend. Датасеты для запуска прототипа НЕ нужны — обученные модели уже
-в репозитории, а веса DINOv2 скачаются автоматически при первом запуске.
+### ⚡ За 1 минуту: запуск в Google Colab (бесплатно, без настройки)
+
+Нажми на ссылку ниже → откроется Google Colab → запусти одну ячейку → через 2 минуты получишь работающий сайт и Telegram-бота:
+
+📌 **[Запустить в Google Colab →](https://colab.research.google.com/github/sumomega-nexus137/D-n-AI/blob/main/notebooks/run_backend_colab.py)**
+
+**Как использовать:**
+1. Открыть ссылку выше (нужен аккаунт Google)
+2. Runtime → Change runtime type → выбрать T4 GPU или CPU
+3. Вписать три значения в ячейку (NGROK_AUTHTOKEN, TELEGRAM_BOT_TOKEN, GEMINI_API_KEY)
+4. Runtime → Run all
+5. Через 1–2 минуты появится публичная ссылка на сайт (вид: `https://xxxx.ngrok.io`)
+6. Открыть ссылку → начать загружать фото
+
+**Что там получается:** работающие сайт + модели + консультант + Telegram-бот (если токен задан).
+
+---
+
+### 💻 На своей машине: локальный запуск
+
+Требования: **Python 3.11+**, git, pip. Node **НЕ нужен** — сайт уже собран.
+
+#### Шаг 1. Склонировать репозиторий
 
 ```bash
-# 1. Склонировать
 git clone https://github.com/sumomega-nexus137/D-n-AI
 cd D-n-AI
+```
 
-# 2. Виртуальное окружение и зависимости
+#### Шаг 2. Создать виртуальное окружение и установить зависимости
+
+```bash
+# macOS / Linux
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Windows
 python -m venv .venv
-source .venv/bin/activate         # Windows: .venv\Scripts\activate
-pip install -r requirements.txt   # torch, fastapi, opencv... (~несколько минут)
+.venv\Scripts\activate
 
-# 3. Ключи (необязательно для анализа фото; нужны только для ИИ-консультанта)
-cp .env.example .env              # открыть .env и вписать GEMINI_API_KEY
+# Установить зависимости (3–5 минут)
+pip install -r requirements.txt
+```
 
-# 4. Запуск — backend отдаёт и API, и сайт
+#### Шаг 3. Настроить ключи (опционально)
+
+Анализ фото работает **без ключей**. Ключи нужны только для ИИ-консультанта:
+
+```bash
+cp .env.example .env
+# Открыть .env и вписать:
+#   GEMINI_API_KEY=your_key_here   (от https://aistudio.google.com/apikey)
+#   TELEGRAM_BOT_TOKEN=your_token  (от @BotFather — для бота)
+```
+
+#### Шаг 4. Запустить сервис
+
+```bash
+# Запустить backend (сайт + API + консультант)
 uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Открыть **http://localhost:8000** — откроется сайт, загрузите фото → получите
-разбор. Документация API — http://localhost:8000/docs. При первом запросе
-скачиваются веса DINOv2 (~84 МБ), дальше берутся из кэша.
+**Откроется сайт:** http://localhost:8000
 
-**Telegram-бот** (отдельным процессом):
+Что там есть:
+- 📸 **Загрузка фото** — анализ качества зерна или болезни растения
+- 💬 **ИИ-консультант** — вопросы агроному (если задан GEMINI_API_KEY)
+- 📊 **Класс и цена** — расчёт стоимости партии в тенге
+- 📖 **API документация** — http://localhost:8000/docs
+
+#### Шаг 5. Запустить Telegram-бот (отдельно, опционально)
+
+В отдельном терминале:
 
 ```bash
+# Установить зависимости бота
 pip install -r bot/requirements.txt
-# в .env: TELEGRAM_BOT_TOKEN (от @BotFather) и GEMINI_API_KEY (для голосовых)
+
+# В .env должны быть:
+#   TELEGRAM_BOT_TOKEN=your_token
+#   GEMINI_API_KEY=your_key (для голосовых)
+#   BACKEND_URL=http://localhost:8000
+
+# Запустить бот
 python bot/main.py
 ```
 
-**Запуск без своей машины (Colab + ngrok, бесплатно):** одна ячейка поднимает
-сайт и бота — см. [`notebooks/run_backend_colab.py`](notebooks/run_backend_colab.py).
-**Docker:** `docker build -t dnai . && docker run -p 7860:7860 dnai`. Подробности
-деплоя — [`docs/DEPLOY.md`](docs/DEPLOY.md).
+Теперь пиши боту в Telegram → он анализирует фото и отвечает голосом.
 
-### Демо-режим без весов
-`DEMO_MODE=1 uvicorn backend.app.main:app --port 8000` — поднимает сервис без
-нейросети и отдаёт заготовленный ответ той же структуры (для проверки интерфейса).
+---
+
+### 🐳 На сервере: Docker
+
+```bash
+# Собрать образ
+docker build -t dnai .
+
+# Запустить контейнер
+docker run -p 8000:8000 \
+  -e GEMINI_API_KEY=your_key \
+  -e TELEGRAM_BOT_TOKEN=your_token \
+  dnai
+```
+
+Сайт появится по адресу: **http://localhost:8000** или на IP сервера.
+
+Подробнее → [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+---
+
+### 🎭 Демо-режим (без загрузки моделей)
+
+Для проверки интерфейса без скачивания DINOv2 (~84 МБ):
+
+```bash
+DEMO_MODE=1 uvicorn backend.app.main:app --port 8000
+```
+
+Сервис вернёт заготовленный ответ, визуально неотличимый от настоящего.
 
 ## 4. Источники данных
 
