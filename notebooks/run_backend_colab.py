@@ -65,14 +65,45 @@ print("backend готов" if ready else "!! backend не поднялся — �
 
 # 2) Telegram-бот: фото → тот же разбор, голос → Gemini. Ходит в backend локально.
 if TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_TOKEN != "ВСТАВЬ":
+    # Telegram разрешает ОДИН поллер на токен. Если бот уже был запущен
+    # (в другой ячейке, другом Colab), новый молча получает 409 Conflict.
+    # Сбрасываем зависшие соединения на сервере Telegram:
+    try:
+        urllib.request.urlopen(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook"
+            "?drop_pending_updates=true",
+            timeout=10,
+        ).read()
+        print("Старые соединения Telegram сброшены.")
+    except Exception as exc:
+        print(f"Предупреждение: сброс webhook не удался ({exc})")
+
     bot_env = {
         **os.environ,
         "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
         "GEMINI_API_KEY": GEMINI_API_KEY,
         "BACKEND_URL": "http://localhost:8000",
     }
-    subprocess.Popen(["python", "bot/main.py"], env=bot_env)
-    print("Telegram-бот запущен.")
+    bot_log = open("/tmp/dnai_bot.log", "wb")
+    bot_proc = subprocess.Popen(
+        ["python", "bot/main.py"], env=bot_env, stdout=bot_log, stderr=bot_log
+    )
+    # Даём боту 6 секунд, проверяем что не упал и подцепился к Telegram
+    time.sleep(6)
+    if bot_proc.poll() is not None:
+        print("!! БОТ УПАЛ. Логи:")
+        print(open("/tmp/dnai_bot.log").read()[-1500:])
+    else:
+        try:
+            import json as _json
+            info = _json.loads(
+                urllib.request.urlopen(
+                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe", timeout=8
+                ).read()
+            )
+            print(f"Бот запущен: @{info['result']['username']} — пишите ему в Telegram.")
+        except Exception as exc:
+            print(f"Бот запущен, но проверка не прошла: {exc}")
 else:
     print("Токен бота не задан — бот пропущен (сайт работает).")
 
