@@ -17,10 +17,12 @@ export const DEMO_GRAIN = {
   summary: { sound_percent: 81.2, grain_impurity_percent: 14.9, foreign_impurity_percent: 3.9 },
   grade: 5,
   grade_label: "5 класс",
-  price_kzt_per_ton: 70000,
-  price_range_kzt_per_ton: [65100, 74900],
+  price_kzt_per_ton: 75000,
+  price_range_kzt_per_ton: [70000, 80000],
+  // 102 500 ₸ (середина вилки 3 класса) − 75 000 ₸ = 27 500 ₸ потерь на тонне
+  loss_vs_best_kzt_per_ton: 27500,
   potential_grade: 4,
-  potential_gain_kzt_per_ton: 15000,
+  potential_gain_kzt_per_ton: 10000,
   recommendations: [
     {
       title: "Просеять партию",
@@ -34,13 +36,13 @@ export const DEMO_GRAIN = {
       detail:
         "Битого и щуплого зерна 13,7%. Дочистка на сепараторе с калибровкой по размеру отсеет мелкую и дроблёную фракцию.",
       priority: "high",
-      gain_kzt_per_ton: 15000,
+      gain_kzt_per_ton: 10000,
     },
     {
       title: "Можно поднять до 4 класса",
-      detail: "После очистки партия проходит под 4 класс. Прибавка около 15 000 ₸ за тонну.",
+      detail: "После очистки партия проходит под 4 класс. Прибавка около 10 000 ₸ за тонну.",
       priority: "high",
-      gain_kzt_per_ton: 15000,
+      gain_kzt_per_ton: 10000,
     },
   ],
   confidence_note: null,
