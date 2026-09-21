@@ -21,6 +21,20 @@ Dän-AI отвечает на все три за несколько секунд
 
 ---
 
+## 🚀 БЫСТРЫЙ СТАРТ: Запустить в Google Colab (за 1-2 минуты, бесплатно)
+
+**[👉 НАЖМИ СЮДА — откроется Colab, нажми "Run all" → сайт готов](https://colab.research.google.com/github/sumomega-nexus137/D-n-AI/blob/main/notebooks/run_backend_colab.py)**
+
+Это самый простой способ. Вот что будет:
+1. Откроется Google Colab (нужен аккаунт Google)
+2. Впиши три значения (NGROK_AUTHTOKEN, TELEGRAM_BOT_TOKEN, GEMINI_API_KEY)
+3. Runtime → Run all
+4. Через 1–2 минуты получишь публичную ссылку на работающий сайт
+
+Или читай инструкции ниже для локального запуска.
+
+---
+
 ## 1. Описание решения
 
 Три функции в одном продукте:
